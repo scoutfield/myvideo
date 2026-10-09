@@ -22,7 +22,9 @@ final class AppSettingsStore: ObservableObject {
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         updateAlertsEnabled = defaults.bool(forKey: Self.alertsKey)
-        cloudSyncEnabled = AppCapabilities.iCloudSyncAvailable && defaults.bool(forKey: Self.cloudKey)
+        // Enable the first iCloud-capable launch; retain a later explicit opt-out.
+        let cloudPreference = defaults.object(forKey: Self.cloudKey) as? Bool ?? true
+        cloudSyncEnabled = AppCapabilities.iCloudSyncAvailable && cloudPreference
     }
 
     func setUpdateAlertsEnabled(_ enabled: Bool) {
@@ -246,12 +248,23 @@ final class CloudLibrarySync: ObservableObject {
             return local
         }
         #if MYVIDEO_ICLOUD
+        guard FileManager.default.ubiquityIdentityToken != nil else {
+            status = "Sign in to iCloud"
+            return local
+        }
+        guard store.synchronize() else {
+            status = "Unavailable"
+            return local
+        }
         let cloud = store.data(forKey: key).flatMap { try? JSONDecoder().decode(CloudLibraryPayload.self, from: $0) }
         let merged = cloud.map { CloudLibraryMerger.merge(local: local, cloud: $0) } ?? local
         if let data = try? JSONEncoder().encode(merged) {
+            guard data.count <= 1_000_000 else {
+                status = "Library exceeds iCloud storage limit"
+                return local
+            }
             store.set(data, forKey: key)
-            _ = store.synchronize()
-            status = "Synced"
+            status = "Sync requested"
         } else {
             status = "Unavailable"
         }

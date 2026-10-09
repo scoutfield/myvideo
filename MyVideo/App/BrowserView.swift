@@ -77,11 +77,19 @@ struct BrowserView: View {
             }
         }
         .task(id: scenePhase) {
+            if scenePhase == .active || scenePhase == .background {
+                synchronizeCloudLibrary()
+            }
             guard scenePhase == .active else { return }
             await refreshLibraryAtAppOpen()
         }
         .task {
             BackgroundRefreshScheduler.schedule()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: NSUbiquitousKeyValueStore.didChangeExternallyNotification)) { notification in
+            let reason = notification.userInfo?[NSUbiquitousKeyValueStoreChangeReasonKey] as? Int
+            guard reason == NSUbiquitousKeyValueStoreServerChange || reason == NSUbiquitousKeyValueStoreInitialSyncChange else { return }
+            synchronizeCloudLibrary()
         }
         .onChange(of: selectedLibraryTab) { _, tab in
             guard tab == .home else { return }
@@ -145,6 +153,21 @@ struct BrowserView: View {
                     BrowserToolbar(viewModel: viewModel)
                 }
             }
+        }
+    }
+
+    private func synchronizeCloudLibrary() {
+        guard appSettings.cloudSyncEnabled else { return }
+        let merged = CloudLibrarySync.shared.synchronize(
+            savedItems: savedItemsStore.items,
+            playedItems: playedItemsStore.items,
+            enabled: true
+        )
+        if merged.savedItems != savedItemsStore.items {
+            savedItemsStore.mergeFromCloud(merged.savedItems)
+        }
+        if merged.playedItems != playedItemsStore.items {
+            playedItemsStore.mergeFromCloud(merged.playedItems)
         }
     }
 

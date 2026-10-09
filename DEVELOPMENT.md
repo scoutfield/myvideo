@@ -525,7 +525,9 @@ both from current tooling instead of copying an old release record. The phone
 must be connected, unlocked, trusted, and supported by the installed Xcode.
 
 Personal Team builds keep local Saved, Played, progress, and settings but cannot
-use the iCloud entitlement. Generate an eligible iCloud build explicitly:
+use the iCloud entitlement. The checked-in GM4SSCNNUK paid-team project and generator default enable iCloud key-value storage. Sync Library defaults on only when no preference exists; explicit opt-out is preserved. Sync runs at launch/foreground/background and on incoming server changes, with Sync Now available in Settings. Status must not claim a confirmed cloud roundtrip from `synchronize()` alone. The legacy payload merges additions/latest progress and does not propagate deletions or include media files and other settings.
+
+For another eligible team, generate an iCloud build explicitly (use `MYVIDEO_ICLOUD_ENABLED=0` for a local-only build):
 
 ```sh
 MYVIDEO_DEVELOPMENT_TEAM=<apple-team-id> \

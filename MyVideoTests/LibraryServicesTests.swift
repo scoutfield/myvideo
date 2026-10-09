@@ -18,6 +18,15 @@ final class LibraryServicesTests: XCTestCase {
         XCTAssertEqual(restored.cloudSyncEnabled, AppCapabilities.iCloudSyncAvailable)
     }
 
+    func testCloudSyncDefaultsOnWhenSupportedAndPreservesOptOut() {
+        let suite = "LibraryServicesTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        XCTAssertEqual(AppSettingsStore(defaults: defaults).cloudSyncEnabled, AppCapabilities.iCloudSyncAvailable)
+        AppSettingsStore(defaults: defaults).setCloudSyncEnabled(false)
+        XCTAssertFalse(AppSettingsStore(defaults: defaults).cloudSyncEnabled)
+    }
+
     func testDeepLinkRoundTripAndRejectsUntrustedAndLegacySchemes() throws {
         let item = MyVideoItem(listPath: "series/42", title: "A Show")
         let url = try XCTUnwrap(MyVideoDeepLink.makeURL(item: item, episodeKey: "ep-4"))
@@ -49,6 +58,7 @@ final class LibraryServicesTests: XCTestCase {
         XCTAssertEqual(merged.playedItems, [new])
     }
 
+    #if !MYVIDEO_ICLOUD
     func testCloudSyncReportsUnavailableWhenBuildHasNoICloudEntitlement() {
         let item = MyVideoItem(listPath: "saved", title: "Saved")
 
@@ -62,6 +72,8 @@ final class LibraryServicesTests: XCTestCase {
         XCTAssertEqual(CloudLibrarySync.shared.status, "Unavailable")
         XCTAssertEqual(result.savedItems, [item])
     }
+
+    #endif
 
     func testNotificationBatchIncludesOnlyEnabledNewItems() throws {
         let first = MyVideoItem(listPath: "one", title: "One", subTitle: "EP 2")

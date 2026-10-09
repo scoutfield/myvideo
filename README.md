@@ -60,6 +60,8 @@ The UI suite uses a deterministic local fixture. The 50-action power-user scenar
 If Xcode says it cannot create a provisioning profile, keep the bundle id `com.john.myvideo` or change it to a unique personal bundle id, then let Xcode manage signing automatically.
 The installed Xcode version must also support the iOS version currently running on the phone so its developer disk image can mount.
 
+The checked-in paid-team build enables Sync Library by default, synchronizing Saved titles and Played history/progress on launch, foreground return, entering the background, or Settings → iCloud → Sync Now. Incoming iCloud library changes are merged while the app is open. Turning Sync Library off remains respected across launches. The existing merge keeps library additions and the latest playback record; it does not propagate deletions or sync video files, skip settings, or Ready to Watch pins. “Sync requested” means the data was handed to iCloud, not that another device has received it.
+
 Personal Team builds keep Saved, Played, progress, and settings locally but disable iCloud sync because Apple does not allow the iCloud entitlement on free provisioning profiles. To regenerate for an eligible paid team with iCloud enabled:
 
 ```sh

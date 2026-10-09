@@ -8,7 +8,7 @@ project = Xcodeproj::Project.new(project_path)
 deployment_target = "17.0"
 bundle_id = "com.john.myvideo"
 team_id = ENV.fetch("MYVIDEO_DEVELOPMENT_TEAM", "GM4SSCNNUK")
-icloud_enabled = ENV["MYVIDEO_ICLOUD_ENABLED"] == "1"
+icloud_enabled = ENV.fetch("MYVIDEO_ICLOUD_ENABLED", team_id == "GM4SSCNNUK" ? "1" : "0") == "1"
 
 project.root_object.attributes["LastSwiftUpdateCheck"] = "2620"
 project.root_object.attributes["LastUpgradeCheck"] = "2620"
@@ -86,6 +86,7 @@ end
 
 unit_test_target.build_configurations.each do |config|
   settings = config.build_settings
+  settings["SWIFT_ACTIVE_COMPILATION_CONDITIONS"] = "$(inherited) MYVIDEO_ICLOUD" if icloud_enabled
   settings["CODE_SIGN_STYLE"] = "Automatic"
   settings["DEVELOPMENT_TEAM"] = team_id
   settings["GENERATE_INFOPLIST_FILE"] = "YES"
