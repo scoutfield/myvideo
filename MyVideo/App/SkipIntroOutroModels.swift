@@ -29,7 +29,7 @@ struct SkipDetectionPolicy: Equatable, Sendable {
         maximumStoredEpisodesPerSeries: 3,
         maximumHashesPerEpisode: 500,
         maximumDurationVarianceRatio: 0.20,
-        defaultIntroPresentationTime: 5,
+        defaultIntroPresentationTime: 0,
         undoDuration: 8
     )
 }

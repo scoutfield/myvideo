@@ -15,14 +15,14 @@ final class SkipOpportunityProjectorTests: XCTestCase {
         XCTAssertNil(project(profile, position: 72))
     }
 
-    func testCorrectedIntroWithoutStartAppearsFiveSecondsAfterProgramStart() throws {
+    func testCorrectedIntroWithoutStartIsAvailableAtProgramStart() throws {
         let profile = try profile(
             intro: SkipIntroMarker(start: nil, end: 61),
             source: .userCorrected
         )
 
-        XCTAssertNil(project(profile, position: 4.999))
-        XCTAssertEqual(project(profile, position: 5)?.target, 61)
+        XCTAssertNil(project(profile, position: -0.001))
+        XCTAssertEqual(project(profile, position: 0)?.target, 61)
     }
 
     func testOutroUsesSecondsRemainingAndTargetsProgramCompletion() throws {

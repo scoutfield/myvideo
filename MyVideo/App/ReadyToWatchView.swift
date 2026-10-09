@@ -85,12 +85,15 @@ struct ReadyToWatchQueueView: View {
     let onMarkWatched: (ReadyToWatchEntry) -> Void
     let onReorderPins: ([String]) -> Void
 
+    @State private var projectionDate = Date()
+
     private var entries: [ReadyToWatchEntry] {
         ReadyToWatchProjector.project(
             savedItems: savedItemsStore.items,
             updates: savedItemsStore.readyToWatchUpdates,
             playedRecords: playedItemsStore.items,
-            overrides: readyToWatchStore.overrides
+            overrides: readyToWatchStore.overrides,
+            now: projectionDate
         )
     }
 
@@ -140,6 +143,13 @@ struct ReadyToWatchQueueView: View {
             }
         }
         .accessibilityIdentifier("readyToWatchQueue")
+        .task {
+            while !Task.isCancelled {
+                projectionDate = Date()
+                do { try await Task.sleep(for: .seconds(1)) }
+                catch { return }
+            }
+        }
     }
 
     private func queueRow(_ entry: ReadyToWatchEntry) -> some View {

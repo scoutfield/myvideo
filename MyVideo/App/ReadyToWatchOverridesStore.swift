@@ -5,6 +5,16 @@ struct ReadyPin: Codable, Equatable, Sendable {
     let episodeKey: String?
     let orderToken: String
     let modifiedAt: Date
+    let addedAt: Date?
+
+    init(titleID: String, episodeKey: String?, orderToken: String,
+         modifiedAt: Date, addedAt: Date? = nil) {
+        self.titleID = titleID
+        self.episodeKey = episodeKey
+        self.orderToken = orderToken
+        self.modifiedAt = modifiedAt
+        self.addedAt = addedAt
+    }
 }
 
 struct ReadyDismissal: Codable, Equatable, Sendable {
@@ -250,7 +260,8 @@ final class ReadyToWatchOverridesStore: ObservableObject {
         guard let titleID = Self.normalized(titleID), let date = Self.valid(date) else { return }
         let episodeKey = Self.normalized(episodeKey)
         if let existing = overrides.pins.first(where: { $0.titleID == titleID }),
-           existing.episodeKey == episodeKey {
+           existing.episodeKey == episodeKey,
+           date.timeIntervalSince(existing.addedAt ?? existing.modifiedAt) < ReadyToWatchProjector.cardLifetime {
             return
         }
         let suffix = tokenGenerator()
@@ -262,7 +273,8 @@ final class ReadyToWatchOverridesStore: ObservableObject {
             titleID: titleID,
             episodeKey: episodeKey,
             orderToken: Self.orderToken(rank: rank, suffix: tokenSuffix),
-            modifiedAt: date
+            modifiedAt: date,
+            addedAt: date
         )
         let updated = ReadyToWatchOverrides(
             pins: [pin] + overrides.pins.filter { $0.titleID != titleID },
@@ -315,7 +327,8 @@ final class ReadyToWatchOverridesStore: ObservableObject {
                 titleID: pin.titleID,
                 episodeKey: pin.episodeKey,
                 orderToken: Self.orderToken(rank: index, suffix: Self.suffix(from: pin.orderToken)),
-                modifiedAt: date
+                modifiedAt: date,
+                addedAt: pin.addedAt ?? pin.modifiedAt
             )
         }
         replace(with: ReadyToWatchOverrides(

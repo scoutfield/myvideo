@@ -50,6 +50,16 @@ final class ReadyToWatchOverridesStoreTests: XCTestCase {
         XCTAssertEqual(Set(store.overrides.pins.map(\.orderToken)).count, 3)
     }
 
+    func testReorderPreservesAdditionDateAndExplicitRepinRenewsExpiredCard() {
+        let store = makeStore(tokens: ["a", "b", "c"])
+        store.pin(titleID: "alpha", episodeKey: "01", at: date(10))
+        store.pin(titleID: "beta", episodeKey: "02", at: date(20))
+        store.reorder(titleIDs: ["beta", "alpha"], at: date(90_000))
+        XCTAssertEqual(store.overrides.pins.first { $0.titleID == "alpha" }?.addedAt, date(10))
+        store.pin(titleID: "alpha", episodeKey: "01", at: date(90_001))
+        XCTAssertEqual(store.overrides.pins.first { $0.titleID == "alpha" }?.addedAt, date(90_001))
+    }
+
     func testUnpinCreatesTombstoneAndAllowsAutomaticProjection() {
         let store = makeStore()
         let show = MyVideoItem(listPath: "show", title: "Show", isSerial: true)
@@ -68,7 +78,8 @@ final class ReadyToWatchOverridesStoreTests: XCTestCase {
                 detectedAt: date(30)
             )],
             playedRecords: [],
-            overrides: store.overrides
+            overrides: store.overrides,
+            now: date(40)
         )
         XCTAssertEqual(projected.map(\.episodeKey), ["04"])
         XCTAssertEqual(projected.map(\.source), [.newEpisode])

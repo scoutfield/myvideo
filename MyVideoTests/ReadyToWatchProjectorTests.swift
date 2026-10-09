@@ -49,7 +49,8 @@ final class ReadyToWatchProjectorTests: XCTestCase {
             saved: [alpha, beta, gamma],
             updates: [update(gamma, episode: "05", detectedAt: 500)],
             played: [record(alpha, episode: "01", position: 10, playedAt: 900)],
-            overrides: overrides
+            overrides: overrides,
+            now: date(1_000)
         )
 
         XCTAssertEqual(entries.map(\.item.id), [beta.id, alpha.id, gamma.id])
@@ -90,13 +91,15 @@ final class ReadyToWatchProjectorTests: XCTestCase {
         XCTAssertTrue(project(
             saved: [show],
             updates: [update(show, episode: "04", detectedAt: 100)],
-            overrides: overrides
+            overrides: overrides,
+            now: date(1_000)
         ).isEmpty)
 
         let next = project(
             saved: [show],
             updates: [update(show, episode: "05", detectedAt: 200)],
-            overrides: overrides
+            overrides: overrides,
+            now: date(1_000)
         )
         XCTAssertEqual(next.map(\.episodeKey), ["05"])
     }
@@ -141,17 +144,57 @@ final class ReadyToWatchProjectorTests: XCTestCase {
         XCTAssertTrue(project(saved: [malformed], overrides: overrides).isEmpty)
     }
 
+    func testEveryCardSourceExpiresAt24HoursAndDoesNotReappearOnProjection() {
+        let pin = item("pinned")
+        let updated = item("updated")
+        let unfinished = item("unfinished")
+        let created = date(1_000)
+        let saved = [pin, updated, unfinished]
+        let updates = [update(updated, episode: "02", detectedAt: 1_000)]
+        let played = [record(unfinished, episode: "01", position: 20, playedAt: 1_000)]
+        let overrides = ReadyToWatchOverrides(pins: [
+            ReadyPin(titleID: pin.id, episodeKey: "03", orderToken: "0001:a", modifiedAt: created)
+        ])
+        func entries(at elapsed: TimeInterval) -> [ReadyToWatchEntry] {
+            ReadyToWatchProjector.project(savedItems: saved, updates: updates,
+                playedRecords: played, overrides: overrides, now: created.addingTimeInterval(elapsed))
+        }
+        XCTAssertEqual(entries(at: 86_399).count, 3)
+        XCTAssertTrue(entries(at: 86_400).isEmpty)
+        XCTAssertTrue(entries(at: 172_800).isEmpty)
+    }
+
+    func testReorderingDoesNotExtendPinnedCardLifetime() {
+        let show = item("show")
+        let pin = ReadyPin(titleID: show.id, episodeKey: "01", orderToken: "0001:a",
+                           modifiedAt: date(90_000), addedAt: date(1_000))
+        XCTAssertTrue(ReadyToWatchProjector.project(savedItems: [show], updates: [],
+            playedRecords: [], overrides: ReadyToWatchOverrides(pins: [pin]), now: date(91_000)).isEmpty)
+    }
+
+    func testFreshEpisodeCanAppearAfterOldUnfinishedCardExpires() {
+        let show = item("show")
+        let entries = ReadyToWatchProjector.project(
+            savedItems: [show], updates: [update(show, episode: "02", detectedAt: 90_000)],
+            playedRecords: [record(show, episode: "01", position: 20, playedAt: 1_000)],
+            overrides: ReadyToWatchOverrides(), now: date(91_000)
+        )
+        XCTAssertEqual(entries.map(\.episodeKey), ["02"])
+    }
+
     private func project(
         saved: [MyVideoItem],
         updates: [ReadyToWatchUpdate] = [],
         played: [PlayedRecord] = [],
-        overrides: ReadyToWatchOverrides = ReadyToWatchOverrides()
+        overrides: ReadyToWatchOverrides = ReadyToWatchOverrides(),
+        now: Date = Date(timeIntervalSince1970: 1_000)
     ) -> [ReadyToWatchEntry] {
         ReadyToWatchProjector.project(
             savedItems: saved,
             updates: updates,
             playedRecords: played,
-            overrides: overrides
+            overrides: overrides,
+            now: now
         )
     }
 

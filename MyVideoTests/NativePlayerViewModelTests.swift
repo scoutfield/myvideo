@@ -1442,7 +1442,7 @@ final class NativePlayerViewModelTests: XCTestCase {
         viewModel.stop()
     }
 
-    func testSkipIntroOpportunityPerformsAbsoluteSeekAndOffersUndo() async throws {
+    func testIntroAutomaticallySkipsOnceAndUndoDoesNotSkipAgain() async throws {
         let skipStore = makeSkipStore()
         XCTAssertTrue(skipStore.save(profile: try SeriesSkipProfile(
             validatingSeriesID: "series",
@@ -1467,14 +1467,44 @@ final class NativePlayerViewModelTests: XCTestCase {
         attachSeekableItem(to: viewModel)
         viewModel.handlePlaybackEntry(index: 0, position: 10, duration: 100, isPlaying: true)
 
-        XCTAssertEqual(viewModel.skipOpportunity, SkipOpportunity(kind: .intro, target: 60))
-        viewModel.performSkip()
+        // A playback update performs the seek without a user action.
         XCTAssertTrue(viewModel.canUndoSkip)
         XCTAssertEqual(castManager.updatedPositions.last, 60)
 
         viewModel.undoSkip()
         XCTAssertFalse(viewModel.canUndoSkip)
         XCTAssertEqual(castManager.updatedPositions.last, 10)
+        let skipCount = castManager.updatedPositions.filter { $0 == 60 }.count
+        viewModel.handlePlaybackEntry(index: 0, position: 10, duration: 100, isPlaying: true)
+        XCTAssertEqual(castManager.updatedPositions.filter { $0 == 60 }.count, skipCount)
+        viewModel.stop()
+    }
+
+    func testOutroAutomaticallySkipsAndDisabledSeriesNeverSeeks() async throws {
+        let skipStore = makeSkipStore()
+        XCTAssertTrue(skipStore.setOutroStart(seriesID: "series", secondsRemaining: 20,
+                                             referenceDuration: 100))
+        let castManager = MockCastPlaybackManager()
+        let viewModel = NativePlayerViewModel(
+            item: MyVideoItem(listPath: "series", title: "Series", isSerial: true),
+            resolver: StubPlaybackResolver(playback: playbackWithAdvertisement()),
+            castManager: castManager, skipMarkerStore: skipStore
+        )
+        viewModel.start()
+        try await waitUntil { viewModel.preparedEntryCount == 1 }
+        attachSeekableItem(to: viewModel)
+        viewModel.disableSkipForSeries()
+        viewModel.handlePlaybackEntry(index: 0, position: 80, duration: 100, isPlaying: true)
+        XCTAssertTrue(viewModel.skipDisabledForSeries)
+        XCTAssertFalse(viewModel.canUndoSkip)
+        XCTAssertFalse(castManager.updatedPositions.contains(100))
+        viewModel.enableSkipForSeries()
+        XCTAssertFalse(viewModel.skipDisabledForSeries)
+        viewModel.handlePlaybackEntry(index: 0, position: 80, duration: 100, isPlaying: false)
+        XCTAssertFalse(viewModel.canUndoSkip)
+        viewModel.handlePlaybackEntry(index: 0, position: 80, duration: 100, isPlaying: true)
+        XCTAssertEqual(castManager.updatedPositions.last, 100)
+        XCTAssertTrue(viewModel.canUndoSkip)
         viewModel.stop()
     }
 

@@ -27,18 +27,21 @@ struct ReadyToWatchEntry: Equatable, Identifiable, Sendable {
 }
 
 enum ReadyToWatchProjector {
+    static let cardLifetime: TimeInterval = 24 * 60 * 60
+
     static func project(
         savedItems: [MyVideoItem],
         updates: [ReadyToWatchUpdate],
         playedRecords: [PlayedRecord],
-        overrides: ReadyToWatchOverrides
+        overrides: ReadyToWatchOverrides,
+        now: Date = Date()
     ) -> [ReadyToWatchEntry] {
         let savedByID = validSavedItems(savedItems)
         let normalizedOverrides = ReadyToWatchOverrides().merging(overrides)
         let updatesByTitle = newestUpdates(updates, savedByID: savedByID)
         let playedByTitle = newestIncompleteRecords(playedRecords, savedByID: savedByID)
         let pins = normalizedOverrides.pins
-            .filter { savedByID[$0.titleID] != nil }
+            .filter { savedByID[$0.titleID] != nil && isFresh($0.addedAt ?? $0.modifiedAt, now: now) }
             .sorted(by: pinOrder)
         let pinnedTitleIDs = Set(pins.map(\.titleID))
 
@@ -68,6 +71,7 @@ enum ReadyToWatchProjector {
             guard !pinnedTitleIDs.contains(item.id) else { return nil }
 
             if let record = playedByTitle[item.id],
+               isFresh(record.lastPlayedAt, now: now),
                !isDismissed(
                 titleID: item.id,
                 episodeKey: normalizedEpisodeKey(record.episodeKey),
@@ -87,7 +91,7 @@ enum ReadyToWatchProjector {
                 )
             }
 
-            if let update = updatesByTitle[item.id] {
+            if let update = updatesByTitle[item.id], isFresh(update.detectedAt, now: now) {
                 let episodeKey = normalizedEpisodeKey(update.episode.mediaKey)
                 guard !isDismissed(
                     titleID: item.id,
@@ -116,6 +120,11 @@ enum ReadyToWatchProjector {
         .map(\.entry)
 
         return manualEntries + automaticEntries
+    }
+
+    private static func isFresh(_ date: Date, now: Date) -> Bool {
+        let age = now.timeIntervalSince(date)
+        return age.isFinite && age >= 0 && age < cardLifetime
     }
 
     private struct RankedEntry {

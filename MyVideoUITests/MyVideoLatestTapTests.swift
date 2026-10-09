@@ -86,6 +86,8 @@ final class MyVideoLatestTapTests: XCTestCase {
         XCTAssertTrue(app.images["homeScreenTitle-brandMark"].waitForExistence(timeout: 5))
         XCTAssertTrue(app.staticTexts["MyVideo"].exists)
         XCTAssertTrue(app.staticTexts["Home"].exists)
+        XCTAssertFalse(app.staticTexts["New for You"].exists)
+        XCTAssertFalse(app.staticTexts["What’s New"].exists)
         XCTAssertTrue(app.staticTexts["homeScreenTitle"].exists)
         XCTAssertTrue(app.images["homeScreenTitle-brandMark"].exists)
         XCTAssertFalse(app.textFields["providerSearchField"].exists)

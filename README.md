@@ -12,7 +12,7 @@ changing navigation, playback, provider requests, persistence, or casting.
 - Fetches the latest signed provider category results and refreshes Home plus
   Saved on cold launch, after 15 minutes in the foreground, or on demand.
 - Opens All as a native, pull-to-refresh catalog with 24-item pagination, score badges, Save/Favorite controls, and direct native playback.
-- Keeps Home focused on discovery, with Continue Watching and New for You sections; filtering and sorting live in each native All catalog.
+- Keeps Home focused on discovery, with Continue Watching; filtering and sorting live in each native All catalog.
 - Provides a collapsed global search that queries the provider's signed catalog API and returns native, playable, saveable cards rather than filtering the small Home sample.
 - Uses one compact poster-card system for Home, Search, Saved, All, and poster rails: a one-line title plus one episode/language/year detail row that never exposes opaque provider episode identifiers. Continue Watching and Played use the matching progress-row variant.
 - Remembers independently selected filters, sort order, and sort direction for each category across navigation and app relaunches.
@@ -26,7 +26,7 @@ changing navigation, playback, provider requests, persistence, or casting.
 - Keeps every listed resolution enabled. Direct-source changes are staged before promotion, and a failed selection reports nonterminal feedback while preserving the active player, source, playback state, and progress.
 - Keeps one player session alive when Back is tapped, with a video mini-player for browsing Home, Saved, Played, and All without interrupting playback.
 - Continues audio while the screen is locked and provides playback speed, sleep timer, lock-screen Now Playing controls, interruption recovery, and transient-load retry.
-- Offers local Skip Intro/Skip Outro suggestions for serial content, with an eight-second Undo and manual timing corrections. Learned fingerprints stay on device, never gate playback, and skip is always user-triggered rather than automatic.
+- Automatically skips known intros and outros for serial content, with an eight-second Undo, manual timing corrections, and a per-series disable toggle. Learned fingerprints stay on device and never gate playback.
 - Provides a third Played tab with resume, watched/unwatched, restart, remove, filter, and clear controls.
 - Supports AirPlay from AVPlayer's native controls plus Google Cast with persistent and expanded TV playback controls.
 - Caches each feed independently, refreshes in the background, and optionally syncs Saved and Played through iCloud.

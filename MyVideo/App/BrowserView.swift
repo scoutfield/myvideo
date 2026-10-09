@@ -340,14 +340,6 @@ private struct HomeView: View {
                                 )
                             }
 
-                            if !newForYou.isEmpty {
-                                NewForYouSection(
-                                    items: newForYou,
-                                    onPlay: viewModel.selectItem,
-                                    onMarkSeen: savedItemsStore.markUpdateSeen
-                                )
-                            }
-
                             if let status = viewModel.latestStatusMessage {
                                 Label(status, systemImage: "clock.arrow.circlepath")
                                     .font(.caption)
@@ -412,12 +404,6 @@ private struct HomeView: View {
 
     private var continueWatching: [PlayedRecord] {
         ContinueWatchingProjector.records(from: playedItemsStore.items)
-    }
-
-    private var newForYou: [MyVideoItem] {
-        MyVideoCategory.allCases
-            .flatMap { viewModel.latestItems[$0] ?? [] }
-            .filter(savedItemsStore.hasNewUpdate)
     }
 
     private var searchControls: some View {
@@ -530,40 +516,6 @@ private struct ContinueWatchingSection: View {
                             Button("Mark Watched", systemImage: "checkmark.circle") { onMarkWatched(record) }
                             Button("Remove", systemImage: "trash", role: .destructive) { onRemove(record) }
                         }
-                    }
-                }
-                .padding(.horizontal, 18)
-            }
-        }
-    }
-}
-
-private struct NewForYouSection: View {
-    let items: [MyVideoItem]
-    let onPlay: (MyVideoItem) -> Void
-    let onMarkSeen: (MyVideoItem) -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Text("New for You")
-                .font(.title3.weight(.semibold))
-                .foregroundStyle(.white)
-                .padding(.horizontal, 18)
-
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 12) {
-                    ForEach(items) { item in
-                        PosterMediaCard(
-                            item: item,
-                            layout: .compact,
-                            actionStyle: .markSeen,
-                            itemIdentifier: "latestItem-\(item.id)",
-                            actionIdentifier: "saveItem-\(item.id)",
-                            scoreIdentifier: "latestScore-\(item.id)",
-                            status: "NEW",
-                            onTap: { onPlay(item) },
-                            onAction: { onMarkSeen(item) }
-                        )
                     }
                 }
                 .padding(.horizontal, 18)

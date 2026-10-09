@@ -238,6 +238,26 @@ final class SkipMarkerStore: ObservableObject {
     }
 
     @discardableResult
+    func enable(seriesID: String, at date: Date = Date()) -> Bool {
+        guard Self.validOperation(seriesID: seriesID, date: date) else { return false }
+        guard let current = profile(for: seriesID) else {
+            return reset(seriesID: seriesID, at: date)
+        }
+        return save(profile: SeriesSkipProfile(
+            seriesID: current.seriesID,
+            intro: current.intro,
+            outroStartSecondsRemaining: current.outroStartSecondsRemaining,
+            confidence: current.confidence,
+            agreeingEpisodeCount: current.agreeingEpisodeCount,
+            source: current.source,
+            referenceDuration: current.referenceDuration,
+            updatedAt: date,
+            disabled: false,
+            schemaVersion: current.schemaVersion
+        ))
+    }
+
+    @discardableResult
     func disable(seriesID: String, at date: Date = Date()) -> Bool {
         guard Self.validOperation(seriesID: seriesID, date: date) else {
             diagnostic = .invalidInput

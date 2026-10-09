@@ -3,6 +3,18 @@ import XCTest
 
 @MainActor
 final class SkipMarkerStoreTests: XCTestCase {
+    func testDisabledSeriesCanBeReenabledWithoutLosingTimingAcrossRelaunch() {
+        let persistence = InMemorySkipPersistence()
+        let store = makeStore(persistence)
+        XCTAssertTrue(store.setIntroEnd(seriesID: "series", time: 60, referenceDuration: 100, at: Date(timeIntervalSince1970: 10)))
+        XCTAssertTrue(store.disable(seriesID: "series", at: Date(timeIntervalSince1970: 20)))
+        XCTAssertTrue(makeStore(persistence).isDisabled(seriesID: "series"))
+        XCTAssertTrue(store.enable(seriesID: "series", at: Date(timeIntervalSince1970: 30)))
+        let restored = makeStore(persistence)
+        XCTAssertFalse(restored.isDisabled(seriesID: "series"))
+        XCTAssertEqual(restored.profile(for: "series")?.intro?.end, 60)
+    }
+
     func testProfilesAndFingerprintsRoundTripThroughSeparateVersionedPayloads() throws {
         let persistence = InMemorySkipPersistence()
         let store = makeStore(persistence)

@@ -32,7 +32,8 @@ These are product invariants, not incidental implementation details.
 
 ### Discovery
 
-- Home contains exactly Movies, Series, Variety, and Anime.
+- Home contains Movies, Series, Variety, and Anime plus Continue Watching. Do not
+  add a separate What’s New or New for You rail.
 - Home is a fast, unfiltered discovery surface. Filtering and sorting do not
   belong on the small recent sample.
 - Home trusts the provider's last-updated descending order. A cold launch uses
@@ -97,6 +98,9 @@ These are product invariants, not incidental implementation details.
   add it to Home or turn it into a calendar/release forecast.
 - Project the queue from Saved items, retained episode snapshots, Played records,
   and sparse user overrides. Never persist a materialized queue snapshot.
+- All Ready to Watch cards expire after 24 hours: pins from their addition
+  time (reordering does not extend it), updates from detection time, and unfinished entries from last playback.
+  Reprojection must not renew an old source. Expiry leaves All Saved unchanged.
 - Keep at most one entry per Saved title. Manual pins come first; then new exact
   episodes; then unfinished playback. An unfinished episode wins over a new
   episode for the same title until it is completed or dismissed.
@@ -110,8 +114,12 @@ These are product invariants, not incidental implementation details.
 
 ### Skip Intro And Outro
 
-- Skip is local-first, serial-only, button-only, and advisory. Never seek without
-  a user tap, and always expose a short Undo after a skip.
+- Skip is local-first and serial-only. During active local playback, accepted
+  intro/outro markers skip automatically once per episode. Offer a short Undo;
+  Undo and backward seeking must not immediately repeat the same automatic skip.
+- Disable Skip for This Series persists and can be toggled back on without
+  discarding known timing. Paused, loading, casting, and unseekable playback
+  must not automatically skip.
 - Marker precedence is user-corrected, trusted provider metadata, then learned
   visual fingerprints. Low-confidence or duration-outlier profiles stay hidden.
 - Sample frames only from the active program `AVPlayerItem`; never create a second
@@ -142,7 +150,7 @@ These are product invariants, not incidental implementation details.
   and AirPlay to `AVPlayerViewController`'s native chrome. Do not duplicate those
   controls in SwiftUI or add a separate top-bar route picker.
 - Keep only app-specific actions outside the native chrome: Back, Episodes,
-  quality/settings, Google Cast, Skip Intro/Outro/Undo, autoplay cancellation,
+  quality/settings, Google Cast, Undo Skip, autoplay cancellation,
   retry, and explicit website fallback.
 - Hide the paused local player's native controls while Google Cast owns playback
   so local transport never appears active during a Cast session.

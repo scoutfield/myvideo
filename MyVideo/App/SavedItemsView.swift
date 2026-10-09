@@ -48,13 +48,15 @@ struct SavedItemsView: View {
                                     .accessibilityIdentifier("savedRefreshStatus")
                             }
 
-                            ReadyToWatchRail(
-                                entries: readyEntries,
-                                onPlay: play,
-                                onDismiss: dismiss,
-                                onPin: pin,
-                                destination: queueDestination
-                            )
+                            TimelineView(.periodic(from: .now, by: 1)) { context in
+                                ReadyToWatchRail(
+                                    entries: readyEntries(at: context.date),
+                                    onPlay: play,
+                                    onDismiss: dismiss,
+                                    onPin: pin,
+                                    destination: queueDestination
+                                )
+                            }
 
                             Text("All Saved")
                                 .font(.title3.bold())
@@ -89,12 +91,13 @@ struct SavedItemsView: View {
         }
     }
 
-    private var readyEntries: [ReadyToWatchEntry] {
+    private func readyEntries(at date: Date) -> [ReadyToWatchEntry] {
         ReadyToWatchProjector.project(
             savedItems: savedItemsStore.items,
             updates: savedItemsStore.readyToWatchUpdates,
             playedRecords: playedItemsStore.items,
-            overrides: readyToWatchStore.overrides
+            overrides: readyToWatchStore.overrides,
+            now: date
         )
     }
 
