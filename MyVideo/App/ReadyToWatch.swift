@@ -43,7 +43,6 @@ enum ReadyToWatchProjector {
         let pins = normalizedOverrides.pins
             .filter { savedByID[$0.titleID] != nil && isFresh($0.addedAt ?? $0.modifiedAt, now: now) }
             .sorted(by: pinOrder)
-        let pinnedTitleIDs = Set(pins.map(\.titleID))
 
         let manualEntries = pins.compactMap { pin -> ReadyToWatchEntry? in
             guard let item = savedByID[pin.titleID] else { return nil }
@@ -56,6 +55,7 @@ enum ReadyToWatchProjector {
                 item: item,
                 episodeKey: episodeKey
             )
+            guard !watchedMoreThanHalf(matchingRecord) else { return nil }
             return ReadyToWatchEntry(
                 item: item,
                 episodeKey: episodeKey,
@@ -67,10 +67,12 @@ enum ReadyToWatchProjector {
             )
         }
 
+        let pinnedTitleIDs = Set(manualEntries.map(\.item.id))
         let automaticEntries = savedByID.values.compactMap { item -> RankedEntry? in
             guard !pinnedTitleIDs.contains(item.id) else { return nil }
 
             if let record = playedByTitle[item.id],
+               !watchedMoreThanHalf(record),
                isFresh(record.lastPlayedAt, now: now),
                !isDismissed(
                 titleID: item.id,
@@ -93,6 +95,9 @@ enum ReadyToWatchProjector {
 
             if let update = updatesByTitle[item.id], isFresh(update.detectedAt, now: now) {
                 let episodeKey = normalizedEpisodeKey(update.episode.mediaKey)
+                guard !watchedMoreThanHalf(newestMatchingRecord(
+                    in: playedRecords, item: item, episodeKey: episodeKey
+                )) else { return nil }
                 guard !isDismissed(
                     titleID: item.id,
                     episodeKey: episodeKey,
@@ -168,7 +173,7 @@ enum ReadyToWatchProjector {
         savedByID: [String: MyVideoItem]
     ) -> [String: PlayedRecord] {
         records.reduce(into: [:]) { result, record in
-            guard let savedItem = savedByID[record.item.id], isValidIncomplete(record, item: savedItem) else {
+            guard let savedItem = savedByID[record.item.id], isValidPlaybackRecord(record, item: savedItem) else {
                 return
             }
             guard let current = result[savedItem.id] else {
@@ -179,17 +184,20 @@ enum ReadyToWatchProjector {
                 (record.lastPlayedAt == current.lastPlayedAt && record.id < current.id) {
                 result[savedItem.id] = record
             }
-        }
+        }.filter { !$0.value.isCompleted }
     }
 
     private static func isValidIncomplete(_ record: PlayedRecord, item: MyVideoItem) -> Bool {
+        isValidPlaybackRecord(record, item: item) && !record.isCompleted
+    }
+
+    private static func isValidPlaybackRecord(_ record: PlayedRecord, item: MyVideoItem) -> Bool {
         guard
             record.position.isFinite,
             record.position > 0,
             record.duration.isFinite,
             record.duration > 0,
-            record.lastPlayedAt.timeIntervalSinceReferenceDate.isFinite,
-            !record.isCompleted
+            record.lastPlayedAt.timeIntervalSinceReferenceDate.isFinite
         else {
             return false
         }
@@ -215,13 +223,21 @@ enum ReadyToWatchProjector {
             .filter {
                 $0.item.id == item.id &&
                     normalizedEpisodeKey($0.episodeKey) == episodeKey &&
-                    isValidIncomplete($0, item: item)
+                    $0.position.isFinite && $0.position >= 0 &&
+                    $0.duration.isFinite && $0.duration > 0 &&
+                    $0.lastPlayedAt.timeIntervalSinceReferenceDate.isFinite
             }
             .sorted {
                 if $0.lastPlayedAt != $1.lastPlayedAt { return $0.lastPlayedAt > $1.lastPlayedAt }
                 return $0.id < $1.id
             }
             .first
+    }
+
+    private static func watchedMoreThanHalf(_ record: PlayedRecord?) -> Bool {
+        guard let record, record.position.isFinite,
+              record.duration.isFinite, record.duration > 0 else { return false }
+        return record.position / record.duration > 0.5
     }
 
     private static func pinOrder(_ lhs: ReadyPin, _ rhs: ReadyPin) -> Bool {

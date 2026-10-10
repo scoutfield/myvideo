@@ -101,9 +101,14 @@ These are product invariants, not incidental implementation details.
 - All Ready to Watch cards expire after 24 hours: pins from their addition
   time (reordering does not extend it), updates from detection time, and unfinished entries from last playback.
   Reprojection must not renew an old source. Expiry leaves All Saved unchanged.
+- Hide an episode from every Ready to Watch source once its newest valid playback
+  record exceeds 50% of its duration. Exactly 50% remains eligible, unknown duration
+  cannot establish the threshold, and a different unwatched episode may appear.
+  Apply this during projection without removing Saved items, pins, or Played history.
 - Keep at most one entry per Saved title. Manual pins come first; then new exact
   episodes; then unfinished playback. An unfinished episode wins over a new
-  episode for the same title until it is completed or dismissed.
+  episode for the same title until it exceeds half watched, expires, is completed,
+  or is dismissed.
 - Exact episode keys are mandatory for serial queue actions. Never guess episode
   1. Movies may use a title-level entry with no episode key.
 - Persist pins, ordering, dismissals, and tombstones. Prune them when a title is

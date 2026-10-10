@@ -182,6 +182,52 @@ final class ReadyToWatchProjectorTests: XCTestCase {
         XCTAssertEqual(entries.map(\.episodeKey), ["02"])
     }
 
+    func testExactlyHalfRemainsAndMoreThanHalfDisappearsForEverySource() {
+        let show = item("show")
+        let pins = ReadyToWatchOverrides(pins: [
+            ReadyPin(titleID: show.id, episodeKey: "01", orderToken: "0001:a", modifiedAt: date(100))
+        ])
+        for position in [50.0, 50.01, 100.0] {
+            let played = [record(show, episode: "01", position: position, playedAt: 200)]
+            let expectedCount = position == 50 ? 1 : 0
+            XCTAssertEqual(project(saved: [show], played: played).count, expectedCount)
+            XCTAssertEqual(project(saved: [show], updates: [update(show, episode: "01", detectedAt: 300)],
+                                   played: played).count, expectedCount)
+            XCTAssertEqual(project(saved: [show], played: played, overrides: pins).count, expectedCount)
+        }
+    }
+
+    func testPastHalfDoesNotFallBackToOlderUnfinishedEpisodeOrSameUpdate() {
+        let show = item("show")
+        for position in [60.0, 100.0] {
+            let entries = project(saved: [show], updates: [update(show, episode: "02", detectedAt: 300)], played: [
+                record(show, episode: "01", position: 20, playedAt: 100),
+                record(show, episode: "02", position: position, playedAt: 200)
+            ])
+            XCTAssertTrue(entries.isEmpty)
+        }
+    }
+
+    func testDifferentNewEpisodeAppearsAfterPastHalfPinnedEpisodeDisappears() {
+        let show = item("show")
+        let pins = ReadyToWatchOverrides(pins: [
+            ReadyPin(titleID: show.id, episodeKey: "01", orderToken: "0001:a", modifiedAt: date(100))
+        ])
+        let entries = project(saved: [show], updates: [update(show, episode: "02", detectedAt: 300)],
+                              played: [record(show, episode: "01", position: 60, playedAt: 200)], overrides: pins)
+        XCTAssertEqual(entries.map(\.episodeKey), ["02"])
+        XCTAssertEqual(entries.map(\.source), [.newEpisode])
+    }
+
+    func testUnknownDurationDoesNotHidePinnedCard() {
+        let show = item("show")
+        let pins = ReadyToWatchOverrides(pins: [
+            ReadyPin(titleID: show.id, episodeKey: "01", orderToken: "0001:a", modifiedAt: date(100))
+        ])
+        XCTAssertEqual(project(saved: [show], played: [record(show, episode: "01", position: 60,
+                            duration: 0, playedAt: 200)], overrides: pins).count, 1)
+    }
+
     private func project(
         saved: [MyVideoItem],
         updates: [ReadyToWatchUpdate] = [],
