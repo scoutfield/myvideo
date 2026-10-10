@@ -32,8 +32,20 @@ These are product invariants, not incidental implementation details.
 
 ### Discovery
 
-- Home contains Movies, Series, Variety, and Anime plus Continue Watching. Do not
+- Home contains Recommend, Movies, Series, Variety, and Anime plus Continue Watching. Do not
   add a separate What’s New or New for You rail.
+- Recommend uses a separate bounded rating-sorted catalog pool (up to three
+  40-title pages each for Movies, Series, and Anime), not the recent Home sample.
+  Use the provider score: Movies strictly above 8; Series/Anime strictly above 9.
+  Reject invalid/missing scores, exclude Saved IDs immediately, and deduplicate
+  titles while mixing categories in a 12-card rail with existing poster controls.
+- Persist recommendation exposure counts locally. Count once per title per Home
+  visit only when at least half its card intersects the active visible rail.
+  Off-screen, background, Saved, search, settings-overlay, and covered playback
+  surfaces must not count. Keep the third appearance for that visit; suppress
+  subsequent visits permanently. Redraws and refreshes are not extra visits.
+  Retain cached candidates on provider failure; these counts are not part of
+  the current iCloud library payload.
 - Home is a fast, unfiltered discovery surface. Filtering and sorting do not
   belong on the small recent sample.
 - Home trusts the provider's last-updated descending order. A cold launch uses

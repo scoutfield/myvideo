@@ -895,6 +895,54 @@ final class MyVideoLatestTapTests: XCTestCase {
         XCTAssertTrue(app.buttons["catalogItem-fixture-catalog-drama-30"].exists)
     }
 
+    func testRecommendExcludesSavedTitlesImmediately() {
+        let app = XCUIApplication()
+        app.launchArguments += ["-MyVideoUseFixtureFeed", "-MyVideoResetSavedItems", "-MyVideoResetPlayedItems", "-MyVideoResetRecommendationExposures"]
+        app.launch()
+        let titleID = "fixture-catalog-movie-19"
+        XCTAssertTrue(app.buttons["recommendItem-\(titleID)"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["recommendSectionTitle"].exists)
+        app.buttons["saveRecommend-\(titleID)"].tap()
+        XCTAssertFalse(app.buttons["recommendItem-\(titleID)"].exists)
+        app.tabBars.buttons["Saved"].tap()
+        XCTAssertTrue(app.buttons["savedItem-\(titleID)"].waitForExistence(timeout: 5))
+        app.tabBars.buttons["Home"].tap()
+        XCTAssertFalse(app.buttons["recommendItem-\(titleID)"].exists)
+    }
+
+    func testRecommendStopsAfterThreeVisibleHomeVisits() {
+        let app = XCUIApplication()
+        app.launchArguments += ["-MyVideoUseFixtureFeed", "-MyVideoResetSavedItems", "-MyVideoResetPlayedItems", "-MyVideoResetRecommendationExposures"]
+        app.launch()
+        let card = app.buttons["recommendItem-fixture-catalog-movie-19"]
+        for visit in 1...3 {
+            XCTAssertTrue(card.waitForExistence(timeout: 10), "Appearance \(visit) must remain visible")
+            app.tabBars.buttons["Saved"].tap()
+            app.tabBars.buttons["Home"].tap()
+        }
+        XCTAssertTrue(app.staticTexts["recommendSectionTitle"].waitForExistence(timeout: 5))
+        XCTAssertFalse(card.waitForExistence(timeout: 2))
+    }
+
+    func testRecommendDoesNotExhaustOffscreenCards() {
+        let app = XCUIApplication()
+        app.launchArguments += ["-MyVideoUseFixtureFeed", "-MyVideoResetSavedItems", "-MyVideoResetPlayedItems", "-MyVideoResetRecommendationExposures"]
+        app.launch()
+        XCTAssertTrue(app.staticTexts["recommendSectionTitle"].waitForExistence(timeout: 10))
+        for _ in 0..<4 {
+            app.tabBars.buttons["Saved"].tap()
+            app.tabBars.buttons["Home"].tap()
+        }
+        let card = app.buttons["recommendItem-fixture-catalog-movie-8"]
+        let rail = app.scrollViews["recommendRail"]
+        for _ in 0..<10 {
+            if card.exists && card.isHittable { break }
+            rail.swipeLeft()
+        }
+        XCTAssertTrue(card.exists)
+        XCTAssertTrue(card.isHittable)
+    }
+
     func testSettingsAreAvailableWithoutAddingAFourthTab() {
         let app = launchFixtureApp()
 

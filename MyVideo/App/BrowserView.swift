@@ -116,6 +116,7 @@ struct BrowserView: View {
                     appSettings: appSettings,
                     savedUpdateMonitor: savedUpdateMonitor,
                     selectedTab: $selectedLibraryTab,
+                    isHomeVisible: playbackSession.presentation != .expanded,
                     onRefreshHome: refreshHome
                 )
             } else {
@@ -216,6 +217,7 @@ private struct LibraryView: View {
     @ObservedObject var appSettings: AppSettingsStore
     @ObservedObject var savedUpdateMonitor: SavedUpdateMonitor
     @Binding var selectedTab: LibraryTab
+    let isHomeVisible: Bool
     let onRefreshHome: (Bool) async -> Void
     @StateObject private var castManager = GoogleCastManager.shared
     @State private var isShowingCastControls = false
@@ -229,6 +231,7 @@ private struct LibraryView: View {
                     playedItemsStore: playedItemsStore,
                     appSettings: appSettings,
                     savedUpdateMonitor: savedUpdateMonitor,
+                    isHomeActive: selectedTab == .home && isHomeVisible,
                     onRefreshHome: onRefreshHome
                 )
                     .tabItem {
@@ -298,7 +301,12 @@ private struct HomeView: View {
     @ObservedObject var playedItemsStore: PlayedItemsStore
     @ObservedObject var appSettings: AppSettingsStore
     @ObservedObject var savedUpdateMonitor: SavedUpdateMonitor
+    let isHomeActive: Bool
     let onRefreshHome: (Bool) async -> Void
+    @StateObject private var recommendations = RecommendationViewModel()
+    @StateObject private var recommendationExposures = RecommendationExposureStore()
+    @State private var homeViewport = CGRect.zero
+    @Environment(\.scenePhase) private var scenePhase
     @StateObject private var searchViewModel = ProviderSearchViewModel()
     @State private var isShowingSettings = false
     @FocusState private var isSearchFocused: Bool
@@ -363,6 +371,18 @@ private struct HomeView: View {
                                 )
                             }
 
+                            RecommendationSection(
+                                items: recommendedItems,
+                                isLoading: recommendations.isLoading,
+                                statusMessage: recommendations.statusMessage,
+                                homeViewport: homeViewport,
+                                isActive: isHomeActive && scenePhase == .active && !isShowingSettings,
+                                exposures: recommendationExposures,
+                                savedItemsStore: savedItemsStore,
+                                onSelectItem: viewModel.selectItem,
+                                onToggleSaved: toggleSaved
+                            )
+
                             if let status = viewModel.latestStatusMessage {
                                 Label(status, systemImage: "clock.arrow.circlepath")
                                     .font(.caption)
@@ -407,13 +427,21 @@ private struct HomeView: View {
                     }
                     .padding(.bottom, LibraryScreenChrome.scrollBottomClearance)
                 }
+                .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { homeViewport = $0 }
                 .refreshable {
                     guard searchViewModel.submittedQuery == nil else { return }
                     await onRefreshHome(true)
+                    await recommendations.loadIfNeeded(force: true)
                 }
             }
         }
         .accessibilityIdentifier("homeView")
+        .task(id: isHomeActive && scenePhase == .active) {
+            let active = isHomeActive && scenePhase == .active
+            recommendationExposures.setActive(active)
+            if active { await recommendations.loadIfNeeded() }
+        }
+        .onDisappear { recommendationExposures.setActive(false) }
         .sheet(isPresented: $isShowingSettings) {
             AppSettingsView(
                 settings: appSettings,
@@ -423,6 +451,14 @@ private struct HomeView: View {
                 savedUpdateMonitor: savedUpdateMonitor
             )
         }
+    }
+
+    private var recommendedItems: [MyVideoItem] {
+        RecommendationProjector.items(
+            from: recommendations.catalogs,
+            savedIDs: Set(savedItemsStore.items.map(\.id)),
+            suppressedIDs: recommendationExposures.suppressedIDs
+        )
     }
 
     private var continueWatching: [PlayedRecord] {
