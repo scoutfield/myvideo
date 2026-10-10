@@ -10,18 +10,18 @@ final class RecommendationTests: XCTestCase {
             .anime: [item("anime-9", score: 9), item("anime-high", score: 9.01)],
             .variety: [item("variety", score: 10)]
         ]
-        XCTAssertEqual(RecommendationProjector.items(from: catalogs, savedIDs: [], suppressedIDs: []).map(\.id),
+        XCTAssertEqual(project(from: catalogs, savedIDs: [], suppressedIDs: []).map(\.id),
                        ["movie-high", "series-high", "anime-high"])
     }
 
     func testSavedAndExhaustedTitlesAreExcludedAndDuplicatesAppearOnlyOnce() {
         let duplicate = item("duplicate", score: 9.5)
-        let items = RecommendationProjector.items(
+        let items = project(
             from: [.movie: [item("saved", score: 10), duplicate], .drama: [duplicate, item("exhausted", score: 9.8)]],
             savedIDs: ["saved"], suppressedIDs: ["exhausted"]
         )
         XCTAssertEqual(items.map(\.id), ["duplicate"])
-        XCTAssertTrue(RecommendationProjector.items(from: [.movie: [duplicate]], savedIDs: [], suppressedIDs: [], limit: 0).isEmpty)
+        XCTAssertTrue(project(from: [.movie: [duplicate]], savedIDs: [], suppressedIDs: [], limit: 0).isEmpty)
     }
 
     func testThreeSeparateVisibleVisitsThenPermanentSuppression() {
@@ -60,15 +60,15 @@ final class RecommendationTests: XCTestCase {
         XCTAssertEqual(store.appearanceCount(for: "title"), 1)
     }
 
-    func testDiscoveryUsesRatingCatalogAndStopsAtPageBoundWithCachedFallback() async {
+    func testDiscoveryUsesRecentCatalogAndStopsAtPageBoundWithCachedFallback() async {
         let defaults = isolatedDefaults()
         defer { defaults.0.removePersistentDomain(forName: defaults.1) }
         let service = RecommendationServiceStub()
-        let model = RecommendationViewModel(service: service, defaults: defaults.0)
+        let model = RecommendationViewModel(service: service, freshness: RecommendationFreshnessStub(), defaults: defaults.0)
         await model.loadIfNeeded(now: Date(timeIntervalSince1970: 1_000))
         let requests = await service.requests
         XCTAssertEqual(requests.count, 9)
-        XCTAssertTrue(requests.allSatisfy { $0.0.sort == .rating && $0.0.descending && $0.2 == 40 })
+        XCTAssertTrue(requests.allSatisfy { $0.0.sort == .updated && $0.0.descending && $0.2 == 40 })
         XCTAssertEqual(Set(requests.map { $0.0.category }), Set([.movie, .drama, .anime]))
         XCTAssertEqual(model.catalogs[.movie]?.count, 3)
         XCTAssertNil(model.statusMessage)
@@ -79,7 +79,7 @@ final class RecommendationTests: XCTestCase {
         await model.loadIfNeeded(force: true)
         XCTAssertEqual(model.catalogs[.movie]?.count, 3)
         XCTAssertNotNil(model.statusMessage)
-        let restored = RecommendationViewModel(service: service, defaults: defaults.0)
+        let restored = RecommendationViewModel(service: service, freshness: RecommendationFreshnessStub(), defaults: defaults.0)
         XCTAssertEqual(restored.catalogs, model.catalogs)
     }
 
@@ -87,11 +87,45 @@ final class RecommendationTests: XCTestCase {
         let defaults = isolatedDefaults()
         defer { defaults.0.removePersistentDomain(forName: defaults.1) }
         let service = RecommendationServiceStub(failPage: 2)
-        let model = RecommendationViewModel(service: service, defaults: defaults.0)
+        let model = RecommendationViewModel(service: service, freshness: RecommendationFreshnessStub(), defaults: defaults.0)
         await model.loadIfNeeded()
         XCTAssertEqual(model.catalogs[.movie]?.count, 1)
         XCTAssertNotNil(model.statusMessage)
         XCTAssertFalse(model.isLoading)
+    }
+
+    func testOnlyUpdatesWithinLast72HoursQualify() {
+        let now = Date(timeIntervalSince1970: 2_000_000)
+        let titles = ["recent", "boundary", "expired", "future", "unknown"].map { item($0, score: 9.5) }
+        let dates = ["recent": now.addingTimeInterval(-1), "boundary": now.addingTimeInterval(-72 * 3600),
+                     "expired": now.addingTimeInterval(-72 * 3600 - 1), "future": now.addingTimeInterval(1)]
+        XCTAssertEqual(Set(RecommendationProjector.items(from: [.movie: titles], savedIDs: [], suppressedIDs: [],
+                                                        updatedDates: dates, now: now).map(\.id)), ["recent", "boundary"])
+    }
+
+    func testProviderDatesParseWithoutTreatingUnknownDatesAsRecent() {
+        XCTAssertEqual(RecommendationDateParser.date("2026年10月09日"), RecommendationDateParser.date("2026-10-09"))
+        XCTAssertEqual(RecommendationDateParser.date("2026-10-09T18:34:00"), RecommendationDateParser.date("2026-10-09T18:34:00Z"))
+        XCTAssertNotNil(RecommendationDateParser.date("2026-10-09T18:34:00.123Z"))
+        XCTAssertNil(RecommendationDateParser.date("unknown"))
+        XCTAssertNil(RecommendationDateParser.date(nil))
+    }
+
+    func testSerialFreshnessUsesEpisodeUpdateInsteadOfOriginalAddDate() async throws {
+        let resolver = RecommendationFreshnessResolver(episodes: RecommendationEpisodeStub())
+        let title = MyVideoItem(listPath: "serial", title: "Serial", addTime: "2020-01-01", isSerial: true,
+                                latestEpisodeKey: "latest")
+        let actual = try await resolver.updatedDate(for: title, category: .drama)
+        XCTAssertEqual(actual, RecommendationDateParser.date("2026-10-09T18:34:00Z"))
+        let movieDate = try await resolver.updatedDate(for: title, category: .movie)
+        XCTAssertEqual(movieDate, RecommendationDateParser.date("2020-01-01"))
+    }
+
+    private func project(from catalogs: [MyVideoCategory: [MyVideoItem]], savedIDs: Set<String>, suppressedIDs: Set<String>, limit: Int = 12) -> [MyVideoItem] {
+        let now = Date()
+        let dates = catalogs.values.flatMap { $0 }.reduce(into: [String: Date]()) { $0[$1.id] = now }
+        return RecommendationProjector.items(from: catalogs, savedIDs: savedIDs, suppressedIDs: suppressedIDs,
+                                             updatedDates: dates, now: now, limit: limit)
     }
 
     private func item(_ id: String, score: Double?) -> MyVideoItem {
@@ -118,5 +152,16 @@ private actor RecommendationServiceStub: CategoryCatalogServing {
         if failing || page == failPage { throw CategoryCatalogError.invalidResponse }
         return CategoryCatalogPage(items: [MyVideoItem(listPath: "\(query.category.id)-\(page)", title: "Title", score: 9.5)],
                                    page: page, isLastPage: false)
+    }
+}
+
+private struct RecommendationFreshnessStub: RecommendationFreshnessResolving {
+    func updatedDate(for item: MyVideoItem, category: MyVideoCategory) async throws -> Date? { Date(timeIntervalSince1970: 900) }
+}
+
+private struct RecommendationEpisodeStub: EpisodePlaylistResolving {
+    func loadEpisodes(for item: MyVideoItem, expectedEpisodeKey: String?) async throws -> [Episode] {
+        [Episode(mediaKey: "old", title: "1", updateDate: "2026-10-01T18:34:00Z"),
+         Episode(mediaKey: "latest", title: "2", updateDate: "2026-10-09T18:34:00Z")]
     }
 }

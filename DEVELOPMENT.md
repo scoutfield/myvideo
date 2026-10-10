@@ -34,9 +34,13 @@ These are product invariants, not incidental implementation details.
 
 - Home contains Recommend, Movies, Series, Variety, and Anime plus Continue Watching. Do not
   add a separate What’s New or New for You rail.
-- Recommend uses a separate bounded rating-sorted catalog pool (up to three
+- Recommend uses a separate bounded last-updated-sorted catalog pool (up to three
   40-title pages each for Movies, Series, and Anime), not the recent Home sample.
   Use the provider score: Movies strictly above 8; Series/Anime strictly above 9.
+  Require a verified update within the preceding 72 hours. Movies use the add
+  date; serial titles use their latest episode update, never their original add
+  date. Missing, invalid, or future dates are excluded. Refilter cached titles
+  against the current time on Home visits; never treat fetch time as update time.
   Reject invalid/missing scores, exclude Saved IDs immediately, and deduplicate
   titles while mixing categories in a 12-card rail with existing poster controls.
 - Persist recommendation exposure counts locally. Count once per title per Home

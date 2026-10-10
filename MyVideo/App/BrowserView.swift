@@ -457,7 +457,8 @@ private struct HomeView: View {
         RecommendationProjector.items(
             from: recommendations.catalogs,
             savedIDs: Set(savedItemsStore.items.map(\.id)),
-            suppressedIDs: recommendationExposures.suppressedIDs
+            suppressedIDs: recommendationExposures.suppressedIDs,
+            updatedDates: recommendations.updatedDates
         )
     }
 

@@ -724,6 +724,7 @@ private actor FixtureCategoryCatalog {
                 listPath: "fixture-catalog-\(category.id)-\(index)",
                 title: "Fixture \(category.title) \(index)",
                 subTitle: category == .movie ? "2026" : "更新至 \(index) 集",
+                addTime: ISO8601DateFormatter().string(from: Date().addingTimeInterval(-3600)),
                 url: "/play/fixture-catalog-\(category.id)-\(index)",
                 year: "今年",
                 region: index.isMultiple(of: 2) ? "欧美" : "大陆",

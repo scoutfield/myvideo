@@ -8,13 +8,16 @@ enum RecommendationProjector {
         from catalogs: [MyVideoCategory: [MyVideoItem]],
         savedIDs: Set<String>,
         suppressedIDs: Set<String>,
+        updatedDates: [String: Date],
+        now: Date = Date(),
         limit: Int = 12
     ) -> [MyVideoItem] {
         guard limit > 0 else { return [] }
         let pools = categories.map { category in
             (catalogs[category] ?? []).filter { item in
-                guard let score = item.score, score.isFinite, score <= 10,
-                      score > (category == .movie ? 8 : 9),
+                guard qualifies(item, category: category),
+                      let updated = updatedDates[item.id],
+                      updated <= now, updated >= now.addingTimeInterval(-72 * 60 * 60),
                       !item.id.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
                       !savedIDs.contains(item.id), !suppressedIDs.contains(item.id) else { return false }
                 return true
@@ -33,6 +36,50 @@ enum RecommendationProjector {
             }
         }
         return result
+    }
+
+    static func qualifies(_ item: MyVideoItem, category: MyVideoCategory) -> Bool {
+        guard let score = item.score, score.isFinite, score <= 10 else { return false }
+        return categories.contains(category) && score > (category == .movie ? 8 : 9)
+    }
+}
+
+enum RecommendationDateParser {
+    static func date(_ raw: String?) -> Date? {
+        guard let raw, !raw.isEmpty else { return nil }
+        let iso = ISO8601DateFormatter()
+        iso.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        if let value = iso.date(from: raw) ?? ISO8601DateFormatter().date(from: raw) { return value }
+        for format in ["yyyy-MM-dd'T'HH:mm:ss", "yyyy-MM-dd HH:mm:ss", "yyyy-MM-dd", "yyyy年MM月dd日"] {
+            let formatter = DateFormatter()
+            formatter.locale = Locale(identifier: "en_US_POSIX")
+            formatter.timeZone = TimeZone(secondsFromGMT: 0)
+            formatter.dateFormat = format
+            formatter.isLenient = false
+            if let value = formatter.date(from: raw) { return value }
+        }
+        return nil
+    }
+}
+
+protocol RecommendationFreshnessResolving: Sendable {
+    func updatedDate(for item: MyVideoItem, category: MyVideoCategory) async throws -> Date?
+}
+
+struct RecommendationFreshnessResolver: RecommendationFreshnessResolving {
+    let episodes: any EpisodePlaylistResolving
+
+    init(episodes: any EpisodePlaylistResolving = NativePlaybackResolver()) {
+        self.episodes = episodes
+    }
+
+    func updatedDate(for item: MyVideoItem, category: MyVideoCategory) async throws -> Date? {
+        #if DEBUG
+        if MyVideoFixtureRuntime.usesFixtureFeed { return RecommendationDateParser.date(item.addTime) }
+        #endif
+        if category == .movie || item.isSerial == false { return RecommendationDateParser.date(item.addTime) }
+        let playlist = try await episodes.loadEpisodes(for: item, expectedEpisodeKey: item.latestEpisodeKey)
+        return playlist.compactMap { RecommendationDateParser.date($0.updateDate) }.max()
     }
 }
 
@@ -84,23 +131,34 @@ final class RecommendationExposureStore: ObservableObject {
 @MainActor
 final class RecommendationViewModel: ObservableObject {
     @Published private(set) var catalogs: [MyVideoCategory: [MyVideoItem]] = [:]
+    @Published private(set) var updatedDates: [String: Date] = [:]
     @Published private(set) var isLoading = false
     @Published private(set) var statusMessage: String?
     private let service: any CategoryCatalogServing
+    private let freshness: any RecommendationFreshnessResolving
     private let defaults: UserDefaults
     private var refreshedAt: Date?
     private var loadTask: Task<Void, Never>?
-    private static let cacheKey = "myvideoRecommendationsCacheV1"
+    private static let cacheKey = "myvideoRecommendationsCacheV2"
 
-    init(service: any CategoryCatalogServing = CategoryCatalogService(), defaults: UserDefaults = .standard) {
+    private struct Snapshot: Codable {
+        let catalog: FeedCacheSnapshot
+        let updatedDates: [String: Date]
+    }
+
+    init(service: any CategoryCatalogServing = CategoryCatalogService(),
+         freshness: any RecommendationFreshnessResolving = RecommendationFreshnessResolver(),
+         defaults: UserDefaults = .standard) {
         self.service = service
+        self.freshness = freshness
         self.defaults = defaults
         if let data = defaults.data(forKey: Self.cacheKey),
-           let snapshot = try? JSONDecoder().decode(FeedCacheSnapshot.self, from: data) {
-            catalogs = Dictionary(uniqueKeysWithValues: snapshot.items.compactMap { key, items in
+           let snapshot = try? JSONDecoder().decode(Snapshot.self, from: data) {
+            catalogs = Dictionary(uniqueKeysWithValues: snapshot.catalog.items.compactMap { key, items in
                 MyVideoCategory(rawValue: key).map { ($0, items) }
             })
-            refreshedAt = snapshot.refreshedAt
+            refreshedAt = snapshot.catalog.refreshedAt
+            updatedDates = snapshot.updatedDates
         }
     }
 
@@ -118,37 +176,50 @@ final class RecommendationViewModel: ObservableObject {
     private func refresh(now: Date) async {
         defer { isLoading = false; loadTask = nil }
         let service = service
-        let results = await withTaskGroup(of: (MyVideoCategory, [MyVideoItem]?, Bool).self) { group in
+        let freshness = freshness
+        let results = await withTaskGroup(of: (MyVideoCategory, [MyVideoItem]?, [String: Date], Bool).self) { group in
             for category in RecommendationProjector.categories {
                 group.addTask {
                     var items: [MyVideoItem] = []
+                    var complete = true
                     // Bounded catalog discovery, separate from Home's eight recent titles.
                     for page in 1...3 {
                         do {
                             try Task.checkCancellation()
                             let response = try await service.fetchPage(
-                                query: CatalogQuery(category: category, sort: .rating), page: page, pageSize: 40
+                                query: CatalogQuery(category: category, sort: .updated), page: page, pageSize: 40
                             )
                             items.append(contentsOf: response.items)
                             if response.isLastPage { break }
                         } catch {
-                            return (category, items.isEmpty ? nil : items, false)
+                            complete = false
+                            break
                         }
                     }
-                    return (category, items, true)
+                    var dates: [String: Date] = [:]
+                    for item in items where RecommendationProjector.qualifies(item, category: category) {
+                        do {
+                            if let date = try await freshness.updatedDate(for: item, category: category) { dates[item.id] = date }
+                        } catch { complete = false }
+                    }
+                    return (category, items.isEmpty && !complete ? nil : items, dates, complete)
                 }
             }
-            var values: [(MyVideoCategory, [MyVideoItem]?, Bool)] = []
+            var values: [(MyVideoCategory, [MyVideoItem]?, [String: Date], Bool)] = []
             for await value in group { values.append(value) }
             return values
         }
         guard !Task.isCancelled else { return }
         var failed: [MyVideoCategory] = []
-        for (category, items, complete) in results {
+        for (category, items, dates, complete) in results {
             if let items {
                 let freshIDs = Set(items.map(\.id))
                 catalogs[category] = items + (complete ? [] : (catalogs[category] ?? []).filter { !freshIDs.contains($0.id) })
+                if complete {
+                    updatedDates = updatedDates.filter { !freshIDs.contains($0.key) }
+                }
             }
+            updatedDates.merge(dates, uniquingKeysWith: { _, new in new })
             if !complete { failed.append(category) }
         }
         statusMessage = failed.isEmpty ? nil : "Recommendations could not refresh for \(failed.map(\.title).sorted().joined(separator: ", "))"
@@ -158,7 +229,9 @@ final class RecommendationViewModel: ObservableObject {
                 items: Dictionary(uniqueKeysWithValues: catalogs.map { ($0.key.rawValue, $0.value) }),
                 refreshedAt: failed.isEmpty ? now : (refreshedAt ?? .distantPast)
             )
-            if let data = try? JSONEncoder().encode(snapshot) { defaults.set(data, forKey: Self.cacheKey) }
+            let retainedIDs = Set(catalogs.values.flatMap { $0.map(\.id) })
+            updatedDates = updatedDates.filter { retainedIDs.contains($0.key) }
+            if let data = try? JSONEncoder().encode(Snapshot(catalog: snapshot, updatedDates: updatedDates)) { defaults.set(data, forKey: Self.cacheKey) }
         }
     }
 }
