@@ -47,6 +47,14 @@ struct AppSettingsView: View {
                         }
                     }
                     Toggle("Autoplay Next", isOn: autoplayBinding)
+                    Toggle("Auto Skip Intro", isOn: Binding(
+                        get: { playback.autoSkipIntro }, set: { playback.setAutoSkipIntro($0) }
+                    ))
+                    .accessibilityIdentifier("autoSkipIntroToggle")
+                    Toggle("Auto Skip Outro", isOn: Binding(
+                        get: { playback.autoSkipOutro }, set: { playback.setAutoSkipOutro($0) }
+                    ))
+                    .accessibilityIdentifier("autoSkipOutroToggle")
                 }
 
                 Section("iCloud") {

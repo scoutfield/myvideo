@@ -117,9 +117,12 @@ These are product invariants, not incidental implementation details.
 - Skip is local-first and serial-only. During active local playback, accepted
   intro/outro markers skip automatically once per episode. Offer a short Undo;
   Undo and backward seeking must not immediately repeat the same automatic skip.
-- Disable Skip for This Series persists and can be toggled back on without
-  discarding known timing. Paused, loading, casting, and unseekable playback
-  must not automatically skip.
+- Settings exposes separate default-on Auto Skip Intro and Auto Skip Outro
+  preferences. Persist opt-outs independently, apply them to existing players,
+  and restore both defaults when resetting playback settings. No per-series
+  disable control remains; legacy disabled profiles are enabled when opening
+  that series without discarding known timing. Paused, loading, casting, and
+  unseekable playback must not automatically skip.
 - Marker precedence is user-corrected, trusted provider metadata, then learned
   visual fingerprints. Low-confidence or duration-outlier profiles stay hidden.
 - Sample frames only from the active program `AVPlayerItem`; never create a second

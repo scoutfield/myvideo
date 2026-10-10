@@ -1455,16 +1455,30 @@ final class NativePlayerViewModelTests: XCTestCase {
             updatedAt: Date(timeIntervalSince1970: 1),
             disabled: false
         )))
+        XCTAssertTrue(skipStore.disable(seriesID: "series"))
+        let suite = "AutoSkipIntro.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let preferences = PlaybackPreferencesStore(defaults: defaults)
+        preferences.setAutoSkipIntro(false)
         let castManager = MockCastPlaybackManager()
         let viewModel = NativePlayerViewModel(
             item: MyVideoItem(listPath: "series", title: "Series", isSerial: true),
             resolver: StubPlaybackResolver(playback: playbackWithAdvertisement()),
             castManager: castManager,
+            preferences: preferences,
             skipMarkerStore: skipStore
         )
+        XCTAssertFalse(skipStore.isDisabled(seriesID: "series"))
+        XCTAssertEqual(skipStore.profile(for: "series")?.intro?.end, 60)
         viewModel.start()
         try await waitUntil { viewModel.preparedEntryCount == 1 }
         attachSeekableItem(to: viewModel)
+        viewModel.handlePlaybackEntry(index: 0, position: 10, duration: 100, isPlaying: true)
+
+        XCTAssertFalse(viewModel.canUndoSkip)
+        XCTAssertFalse(castManager.updatedPositions.contains(60))
+        preferences.setAutoSkipIntro(true)
         viewModel.handlePlaybackEntry(index: 0, position: 10, duration: 100, isPlaying: true)
 
         // A playback update performs the seek without a user action.
@@ -1480,26 +1494,28 @@ final class NativePlayerViewModelTests: XCTestCase {
         viewModel.stop()
     }
 
-    func testOutroAutomaticallySkipsAndDisabledSeriesNeverSeeks() async throws {
+    func testOutroAutomaticallySkipsOnlyWhenGlobalSettingEnabled() async throws {
         let skipStore = makeSkipStore()
         XCTAssertTrue(skipStore.setOutroStart(seriesID: "series", secondsRemaining: 20,
                                              referenceDuration: 100))
+        let suite = "AutoSkipOutro.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let preferences = PlaybackPreferencesStore(defaults: defaults)
+        preferences.setAutoSkipOutro(false)
         let castManager = MockCastPlaybackManager()
         let viewModel = NativePlayerViewModel(
             item: MyVideoItem(listPath: "series", title: "Series", isSerial: true),
             resolver: StubPlaybackResolver(playback: playbackWithAdvertisement()),
-            castManager: castManager, skipMarkerStore: skipStore
+            castManager: castManager, preferences: preferences, skipMarkerStore: skipStore
         )
         viewModel.start()
         try await waitUntil { viewModel.preparedEntryCount == 1 }
         attachSeekableItem(to: viewModel)
-        viewModel.disableSkipForSeries()
         viewModel.handlePlaybackEntry(index: 0, position: 80, duration: 100, isPlaying: true)
-        XCTAssertTrue(viewModel.skipDisabledForSeries)
         XCTAssertFalse(viewModel.canUndoSkip)
         XCTAssertFalse(castManager.updatedPositions.contains(100))
-        viewModel.enableSkipForSeries()
-        XCTAssertFalse(viewModel.skipDisabledForSeries)
+        preferences.setAutoSkipOutro(true)
         viewModel.handlePlaybackEntry(index: 0, position: 80, duration: 100, isPlaying: false)
         XCTAssertFalse(viewModel.canUndoSkip)
         viewModel.handlePlaybackEntry(index: 0, position: 80, duration: 100, isPlaying: true)

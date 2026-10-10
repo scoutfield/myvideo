@@ -183,6 +183,29 @@ final class PlaybackFeaturesTests: XCTestCase {
         XCTAssertEqual(PlaybackQualityPreferenceStore(defaults: defaults, storageKey: "quality").targetHeight, 1_080)
     }
 
+    func testAutoSkipPreferencesDefaultOnPersistIndependentlyAndReset() {
+        let suite = "SkipPreferences.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let preferences = PlaybackPreferencesStore(defaults: defaults)
+        XCTAssertTrue(preferences.autoSkipIntro)
+        XCTAssertTrue(preferences.autoSkipOutro)
+        let existingPlayerPreferences = PlaybackPreferencesStore(defaults: defaults)
+        preferences.setAutoSkipIntro(false)
+        XCTAssertFalse(existingPlayerPreferences.shouldAutomaticallySkip(.intro))
+        XCTAssertTrue(existingPlayerPreferences.shouldAutomaticallySkip(.outro))
+        let restored = PlaybackPreferencesStore(defaults: defaults)
+        XCTAssertFalse(restored.autoSkipIntro)
+        XCTAssertTrue(restored.autoSkipOutro)
+        preferences.setAutoSkipOutro(false)
+        XCTAssertFalse(existingPlayerPreferences.shouldAutomaticallySkip(.outro))
+        preferences.reset()
+        XCTAssertTrue(preferences.autoSkipIntro)
+        XCTAssertTrue(preferences.autoSkipOutro)
+        XCTAssertTrue(existingPlayerPreferences.shouldAutomaticallySkip(.intro))
+        XCTAssertTrue(existingPlayerPreferences.shouldAutomaticallySkip(.outro))
+    }
+
     func testPlaybackPreferencesPersistRateAndAutoplay() {
         let suite = "PlaybackFeaturesTests.\(UUID().uuidString)"
         let defaults = UserDefaults(suiteName: suite)!

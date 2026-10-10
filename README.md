@@ -26,7 +26,7 @@ changing navigation, playback, provider requests, persistence, or casting.
 - Keeps every listed resolution enabled. Direct-source changes are staged before promotion, and a failed selection reports nonterminal feedback while preserving the active player, source, playback state, and progress.
 - Keeps one player session alive when Back is tapped, with a video mini-player for browsing Home, Saved, Played, and All without interrupting playback.
 - Continues audio while the screen is locked and provides playback speed, sleep timer, lock-screen Now Playing controls, interruption recovery, and transient-load retry.
-- Automatically skips known intros and outros for serial content, with an eight-second Undo, manual timing corrections, and a per-series disable toggle. Learned fingerprints stay on device and never gate playback.
+- Automatically skips known intros and outros for serial content, with an eight-second Undo, manual timing corrections, and separate default-on Auto Skip Intro / Auto Skip Outro controls in Settings. Learned fingerprints stay on device and never gate playback.
 - Provides a third Played tab with resume, watched/unwatched, restart, remove, filter, and clear controls.
 - Supports AirPlay from AVPlayer's native controls plus Google Cast with persistent and expanded TV playback controls.
 - Caches each feed independently, refreshes in the background, and optionally syncs Saved and Played through iCloud.

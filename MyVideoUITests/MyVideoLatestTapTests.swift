@@ -902,8 +902,17 @@ final class MyVideoLatestTapTests: XCTestCase {
         app.buttons["appSettings"].tap()
         XCTAssertTrue(app.navigationBars["Settings"].waitForExistence(timeout: 3))
         XCTAssertTrue(app.switches["updateAlertsToggle"].exists)
+        XCTAssertTrue(app.switches["autoSkipIntroToggle"].exists)
+        XCTAssertTrue(app.switches["autoSkipOutroToggle"].exists)
+        XCTAssertEqual(app.switches["autoSkipIntroToggle"].value as? String, "1")
+        XCTAssertEqual(app.switches["autoSkipOutroToggle"].value as? String, "1")
+        app.switches["autoSkipIntroToggle"].coordinate(withNormalizedOffset: CGVector(dx: 0.93, dy: 0.5)).tap()
+        XCTAssertEqual(app.switches["autoSkipIntroToggle"].value as? String, "0")
+        XCTAssertEqual(app.switches["autoSkipOutroToggle"].value as? String, "1")
+        app.switches["autoSkipIntroToggle"].coordinate(withNormalizedOffset: CGVector(dx: 0.93, dy: 0.5)).tap()
         XCTAssertTrue(app.switches["cloudSyncToggle"].exists)
-        XCTAssertTrue(app.buttons["clearFeedCache"].exists)
+        app.swipeUp()
+        XCTAssertTrue(app.buttons["clearFeedCache"].waitForExistence(timeout: 3))
     }
 
     func testSimulatedCastSessionOffersPersistentAndExpandedControls() {

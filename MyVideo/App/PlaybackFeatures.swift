@@ -6,9 +6,13 @@ final class PlaybackPreferencesStore: ObservableObject {
 
     @Published private(set) var playbackRate: Float
     @Published private(set) var autoplayNext: Bool
+    @Published private(set) var autoSkipIntro: Bool
+    @Published private(set) var autoSkipOutro: Bool
 
     private static let rateKey = "myvideoPlaybackRate"
     private static let autoplayKey = "myvideoAutoplayNext"
+    private static let introKey = "myvideoAutoSkipIntro"
+    private static let outroKey = "myvideoAutoSkipOutro"
     private let defaults: UserDefaults
 
     init(defaults: UserDefaults = .standard) {
@@ -16,6 +20,8 @@ final class PlaybackPreferencesStore: ObservableObject {
         let storedRate = defaults.float(forKey: Self.rateKey)
         playbackRate = Self.supportedRates.contains(storedRate) ? storedRate : 1
         autoplayNext = defaults.object(forKey: Self.autoplayKey) as? Bool ?? true
+        autoSkipIntro = defaults.object(forKey: Self.introKey) as? Bool ?? true
+        autoSkipOutro = defaults.object(forKey: Self.outroKey) as? Bool ?? true
     }
 
     func setPlaybackRate(_ rate: Float) {
@@ -31,11 +37,31 @@ final class PlaybackPreferencesStore: ObservableObject {
         defaults.set(enabled, forKey: Self.autoplayKey)
     }
 
+    func setAutoSkipIntro(_ enabled: Bool) {
+        autoSkipIntro = enabled
+        defaults.set(enabled, forKey: Self.introKey)
+    }
+
+    func setAutoSkipOutro(_ enabled: Bool) {
+        autoSkipOutro = enabled
+        defaults.set(enabled, forKey: Self.outroKey)
+    }
+
+    func shouldAutomaticallySkip(_ kind: SkipOpportunity.Kind) -> Bool {
+        // Read the shared preference so an existing player follows Settings immediately.
+        let key = kind == .intro ? Self.introKey : Self.outroKey
+        return defaults.object(forKey: key) as? Bool ?? true
+    }
+
     func reset() {
         defaults.removeObject(forKey: Self.rateKey)
         defaults.removeObject(forKey: Self.autoplayKey)
+        defaults.removeObject(forKey: Self.introKey)
+        defaults.removeObject(forKey: Self.outroKey)
         playbackRate = 1
         autoplayNext = true
+        autoSkipIntro = true
+        autoSkipOutro = true
     }
 }
 

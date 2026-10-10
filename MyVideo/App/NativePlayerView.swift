@@ -151,7 +151,6 @@ final class NativePlayerViewModel: ObservableObject {
     private var monitorTask: Task<Void, Never>?
     private var timeObserver: Any?
     private var automaticallySkippedKinds = Set<SkipOpportunity.Kind>()
-    @Published private(set) var skipDisabledForSeries = false
     private var undoSkipPosition: Double?
     private var undoSkipTask: Task<Void, Never>?
     private var fingerprintSampler: SkipFingerprintSampler?
@@ -251,6 +250,9 @@ final class NativePlayerViewModel: ObservableObject {
         self.itemPreparer = itemPreparer
         self.itemStager = itemStager
         self.skipMarkerStore = skipMarkerStore
+        if skipMarkerStore.isDisabled(seriesID: item.id) {
+            _ = skipMarkerStore.enable(seriesID: item.id)
+        }
         self.onEpisodesObserved = onEpisodesObserved
         playbackRate = preferences.playbackRate
         autoplayNext = preferences.autoplayNext
@@ -488,19 +490,6 @@ final class NativePlayerViewModel: ObservableObject {
             secondsRemaining: playbackDuration - playbackPosition,
             referenceDuration: playbackDuration
         )
-        updateSkipOpportunity()
-    }
-
-    func disableSkipForSeries() {
-        guard supportsSkip else { return }
-        _ = skipMarkerStore.disable(seriesID: item.id)
-        clearUndoSkip()
-        updateSkipOpportunity()
-    }
-
-    func enableSkipForSeries() {
-        guard supportsSkip else { return }
-        _ = skipMarkerStore.enable(seriesID: item.id)
         updateSkipOpportunity()
     }
 
@@ -1425,15 +1414,15 @@ final class NativePlayerViewModel: ObservableObject {
     }
 
     private func automaticallySkipIfNeeded(isPlaying: Bool) {
-        guard isPlaying, hasAppliedResume, !skipDisabledForSeries,
+        guard isPlaying, hasAppliedResume,
               let opportunity = skipOpportunity,
+              preferences.shouldAutomaticallySkip(opportunity.kind),
               !automaticallySkippedKinds.contains(opportunity.kind),
               playbackPositionProtection == nil else { return }
         performSkip()
     }
 
     private func updateSkipOpportunity() {
-        skipDisabledForSeries = skipMarkerStore.isDisabled(seriesID: item.id)
         skipOpportunity = SkipOpportunityProjector.project(
             profile: skipMarkerStore.profile(for: item.id),
             playback: SkipPlaybackState(
@@ -1869,14 +1858,6 @@ struct NativePlayerScreen: View {
                     Button("Set Outro Start Here", systemImage: "backward.end") {
                         viewModel.setOutroStartHere()
                     }
-                    Toggle("Disable Skip for This Series", isOn: Binding(
-                        get: { viewModel.skipDisabledForSeries },
-                        set: { disabled in
-                            if disabled { viewModel.disableSkipForSeries() }
-                            else { viewModel.enableSkipForSeries() }
-                        }
-                    ))
-                    .accessibilityIdentifier("disableSkipForSeries")
                     Button("Reset Learned Timing", systemImage: "arrow.counterclockwise", role: .destructive) {
                         viewModel.resetLearnedSkipTiming()
                     }
