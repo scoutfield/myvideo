@@ -139,7 +139,12 @@ final class RecommendationViewModel: ObservableObject {
     private let defaults: UserDefaults
     private var refreshedAt: Date?
     private var loadTask: Task<Void, Never>?
-    private static let cacheKey = "myvideoRecommendationsCacheV2"
+    private static var cacheKey: String {
+        #if DEBUG
+        if MyVideoFixtureRuntime.usesFixtureFeed { return "myvideoRecommendationsFixtureCacheV2" }
+        #endif
+        return "myvideoRecommendationsCacheV2"
+    }
 
     private struct Snapshot: Codable {
         let catalog: FeedCacheSnapshot
@@ -173,6 +178,15 @@ final class RecommendationViewModel: ObservableObject {
         await task.value
     }
 
+    private func publishProgress(category: MyVideoCategory, items: [MyVideoItem], dates: [String: Date]) {
+        guard !Task.isCancelled, !dates.isEmpty else { return }
+        let freshIDs = Set(items.map(\.id))
+        let merged = items + (catalogs[category] ?? []).filter { !freshIDs.contains($0.id) }
+        if catalogs[category] != merged { catalogs[category] = merged }
+        let mergedDates = updatedDates.merging(dates, uniquingKeysWith: { _, new in new })
+        if updatedDates != mergedDates { updatedDates = mergedDates }
+    }
+
     private func refresh(now: Date) async {
         defer { isLoading = false; loadTask = nil }
         let service = service
@@ -182,7 +196,8 @@ final class RecommendationViewModel: ObservableObject {
                 group.addTask {
                     var items: [MyVideoItem] = []
                     var complete = true
-                    // Bounded catalog discovery, separate from Home's eight recent titles.
+                    var dates: [String: Date] = [:]
+                    // Verify each page immediately instead of waiting for the whole catalog.
                     for page in 1...3 {
                         do {
                             try Task.checkCancellation()
@@ -190,17 +205,36 @@ final class RecommendationViewModel: ObservableObject {
                                 query: CatalogQuery(category: category, sort: .updated), page: page, pageSize: 40
                             )
                             items.append(contentsOf: response.items)
+                            let pageItems = items
+                            let candidates = response.items.filter {
+                                RecommendationProjector.qualifies($0, category: category)
+                            }
+                            await withTaskGroup(of: (String, Date?, Bool).self) { checks in
+                                var pending = candidates.makeIterator()
+                                // Keep provider traffic bounded while a slow title is being checked.
+                                func enqueue(_ item: MyVideoItem) {
+                                    checks.addTask {
+                                        do {
+                                            try Task.checkCancellation()
+                                            return (item.id, try await freshness.updatedDate(for: item, category: category), true)
+                                        } catch { return (item.id, nil, false) }
+                                    }
+                                }
+                                for _ in 0..<2 {
+                                    if let item = pending.next() { enqueue(item) }
+                                }
+                                while let (id, date, succeeded) = await checks.next() {
+                                    if let date { dates[id] = date }
+                                    if !succeeded { complete = false }
+                                    await self.publishProgress(category: category, items: pageItems, dates: dates)
+                                    if !Task.isCancelled, let item = pending.next() { enqueue(item) }
+                                }
+                            }
                             if response.isLastPage { break }
                         } catch {
                             complete = false
                             break
                         }
-                    }
-                    var dates: [String: Date] = [:]
-                    for item in items where RecommendationProjector.qualifies(item, category: category) {
-                        do {
-                            if let date = try await freshness.updatedDate(for: item, category: category) { dates[item.id] = date }
-                        } catch { complete = false }
                     }
                     return (category, items.isEmpty && !complete ? nil : items, dates, complete)
                 }

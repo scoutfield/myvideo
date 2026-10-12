@@ -1,3 +1,4 @@
+import Combine
 import XCTest
 @testable import MyVideo
 
@@ -121,6 +122,49 @@ final class RecommendationTests: XCTestCase {
         XCTAssertEqual(movieDate, RecommendationDateParser.date("2020-01-01"))
     }
 
+    func testVerifiedTitleAppearsWhileAnotherFreshnessCheckIsBlocked() async {
+        let defaults = isolatedDefaults()
+        defer { defaults.0.removePersistentDomain(forName: defaults.1) }
+        let gate = RecommendationGate()
+        let model = RecommendationViewModel(service: ProgressiveRecommendationService(),
+            freshness: ProgressiveRecommendationFreshness(gate: gate), defaults: defaults.0)
+        let visible = expectation(description: "Verified result is published before slow check finishes")
+        visible.assertForOverFulfill = false
+        let observation = model.$updatedDates.sink { dates in
+            if dates["fast"] != nil { visible.fulfill() }
+        }
+        let load = Task { await model.loadIfNeeded(now: Date(timeIntervalSince1970: 1_000)) }
+        await fulfillment(of: [visible], timeout: 1)
+        XCTAssertTrue(model.isLoading)
+        XCTAssertEqual(RecommendationProjector.items(from: model.catalogs, savedIDs: [], suppressedIDs: [],
+            updatedDates: model.updatedDates, now: Date(timeIntervalSince1970: 1_000)).map(\.id), ["fast"])
+        await gate.release()
+        await load.value
+        withExtendedLifetime(observation) {}
+        XCTAssertFalse(model.isLoading)
+        XCTAssertEqual(model.updatedDates.count, 2)
+    }
+
+    func testFirstPageAppearsBeforeLaterCatalogPageFinishes() async {
+        let defaults = isolatedDefaults()
+        defer { defaults.0.removePersistentDomain(forName: defaults.1) }
+        let gate = RecommendationGate()
+        let model = RecommendationViewModel(service: ProgressiveRecommendationService(pageGate: gate),
+            freshness: RecommendationFreshnessStub(), defaults: defaults.0)
+        let visible = expectation(description: "First-page results appear before remaining pages")
+        visible.assertForOverFulfill = false
+        let observation = model.$updatedDates.sink { dates in
+            if dates["fast"] != nil { visible.fulfill() }
+        }
+        let load = Task { await model.loadIfNeeded(now: Date(timeIntervalSince1970: 1_000)) }
+        await fulfillment(of: [visible], timeout: 1)
+        XCTAssertTrue(model.isLoading)
+        await gate.release()
+        await load.value
+        withExtendedLifetime(observation) {}
+        XCTAssertNil(model.statusMessage)
+    }
+
     private func project(from catalogs: [MyVideoCategory: [MyVideoItem]], savedIDs: Set<String>, suppressedIDs: Set<String>, limit: Int = 12) -> [MyVideoItem] {
         let now = Date()
         let dates = catalogs.values.flatMap { $0 }.reduce(into: [String: Date]()) { $0[$1.id] = now }
@@ -163,5 +207,39 @@ private struct RecommendationEpisodeStub: EpisodePlaylistResolving {
     func loadEpisodes(for item: MyVideoItem, expectedEpisodeKey: String?) async throws -> [Episode] {
         [Episode(mediaKey: "old", title: "1", updateDate: "2026-10-01T18:34:00Z"),
          Episode(mediaKey: "latest", title: "2", updateDate: "2026-10-09T18:34:00Z")]
+    }
+}
+
+private actor RecommendationGate {
+    private var released = false
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+    func wait() async {
+        if released { return }
+        await withCheckedContinuation { waiters.append($0) }
+    }
+    func release() {
+        released = true
+        for waiter in waiters { waiter.resume() }
+        waiters.removeAll()
+    }
+}
+
+private struct ProgressiveRecommendationService: CategoryCatalogServing {
+    var pageGate: RecommendationGate? = nil
+    func fetchPage(category: MyVideoCategory, page: Int, pageSize: Int) async throws -> CategoryCatalogPage {
+        if category != .drama { return CategoryCatalogPage(items: [], page: page, isLastPage: true) }
+        if page == 2 { await pageGate?.wait() }
+        return CategoryCatalogPage(items: page == 1 ? [
+            MyVideoItem(listPath: "slow", title: "Slow", score: 9.5),
+            MyVideoItem(listPath: "fast", title: "Fast", score: 9.5)
+        ] : [], page: page, isLastPage: pageGate == nil || page == 2)
+    }
+}
+
+private struct ProgressiveRecommendationFreshness: RecommendationFreshnessResolving {
+    let gate: RecommendationGate
+    func updatedDate(for item: MyVideoItem, category: MyVideoCategory) async throws -> Date? {
+        if item.id == "slow" { await gate.wait() }
+        return Date(timeIntervalSince1970: 900)
     }
 }
