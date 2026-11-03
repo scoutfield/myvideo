@@ -36,31 +36,75 @@ final class MyVideoItemURLTests: XCTestCase {
             url: "/play/drama-media-key"
         )
 
-        XCTAssertEqual(item.playURL.absoluteString, "https://m.yfsp.tv/play/drama-media-key")
+        XCTAssertEqual(item.playURL.absoluteString, "https://m.yifan.tv/play/drama-media-key")
     }
 
     func testPlayURLUsesRawMediaKeyWhenNoURLIsPresent() {
         let item = MyVideoItem(listPath: "raw-media-key", title: "Movie")
 
-        XCTAssertEqual(item.playURL.absoluteString, "https://m.yfsp.tv/play/raw-media-key")
+        XCTAssertEqual(item.playURL.absoluteString, "https://m.yifan.tv/play/raw-media-key")
+    }
+
+    func testLiveYifanCatalogSearchAndPlayback() async throws {
+        guard ProcessInfo.processInfo.environment["MYVIDEO_LIVE_PROVIDER"] == "1" else {
+            throw XCTSkip("Opt-in live provider smoke test")
+        }
+        let catalog = CategoryCatalogService()
+        var movie: MyVideoItem?
+        var serial: MyVideoItem?
+        for category in MyVideoCategory.allCases {
+            let page = try await catalog.fetchPage(category: category, page: 1, pageSize: 8)
+            XCTAssertFalse(page.items.isEmpty)
+            _ = try await catalog.fetchFilters(category: category)
+            if category == .movie { movie = page.items.first }
+            if category == .drama { serial = page.items.first }
+        }
+        let found = try await ProviderSearchService().search(query: ProviderSearchQuery(validating: "沧元图"), page: 1, pageSize: 8)
+        XCTAssertFalse(found.items.isEmpty)
+        let resolver = NativePlaybackResolver()
+        _ = try await resolver.resolve(item: XCTUnwrap(movie), preferredEpisodeKey: nil)
+        let show = try XCTUnwrap(serial)
+        let episodes = try await resolver.loadEpisodes(for: show, expectedEpisodeKey: show.latestEpisodeKey)
+        XCTAssertFalse(episodes.isEmpty)
+        _ = try await resolver.resolve(item: show, preferredEpisodeKey: episodes.first?.mediaKey)
+    }
+
+    func testConfigurationBootstrapUsesCurrentAPIAndTimestampSignature() throws {
+        let url = try ProviderBootstrap.configurationURL(domain: "yifan.tv", now: Date(timeIntervalSince1970: 1000))
+        let components = try XCTUnwrap(URLComponents(url: url, resolvingAgainstBaseURL: false))
+        let values = Dictionary(uniqueKeysWithValues: (components.queryItems ?? []).map { ($0.name, $0.value ?? "") })
+        XCTAssertEqual(url.host, "api.yifan.tv")
+        XCTAssertEqual(url.path, "/api/home/config")
+        XCTAssertEqual(values["pub"], "1000")
+        XCTAssertEqual(values["vv"], "3eaa8234da02bd5c8b8e69bef5548fd5")
+        XCTAssertThrowsError(try ProviderBootstrap.configurationURL(domain: "yifan.tv.attacker.invalid"))
+    }
+
+    func testSavedLegacyProviderURLsUseCurrentDomainWithoutChangingIdentity() {
+        let item = MyVideoItem(listPath: "legacy-key", title: "Saved",
+            verticalImg: "https://static.yfsp.tv/poster.jpg",
+            url: "https://m.yfsp.tv/play/legacy-key?id=episode-2")
+        XCTAssertEqual(item.id, "legacy-key")
+        XCTAssertEqual(item.playURL.absoluteString, "https://m.yifan.tv/play/legacy-key?id=episode-2")
+        XCTAssertEqual(item.thumbnailURL?.host, "static.yifan.tv")
     }
 
     func testThumbnailURLNormalizesProtocolRelativeImageURL() {
         let item = MyVideoItem(
             listPath: "raw-media-key",
             title: "Movie",
-            verticalImg: "//static.yfsp.tv/poster.jpg"
+            verticalImg: "//static.yifan.tv/poster.jpg"
         )
 
-        XCTAssertEqual(item.thumbnailURL?.absoluteString, "https://static.yfsp.tv/poster.jpg")
+        XCTAssertEqual(item.thumbnailURL?.absoluteString, "https://static.yifan.tv/poster.jpg")
     }
 
     func testPosterImageRequestUsesProviderCompatibleHeaders() throws {
-        let url = try XCTUnwrap(URL(string: "https://static.yfsp.tv/poster.jpg"))
+        let url = try XCTUnwrap(URL(string: "https://static.yifan.tv/poster.jpg"))
 
         let request = try PosterImageLoader.makeRequest(for: url)
 
-        XCTAssertEqual(request.value(forHTTPHeaderField: "Referer"), "https://m.yfsp.tv/")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Referer"), "https://m.yifan.tv/")
         XCTAssertTrue(request.value(forHTTPHeaderField: "User-Agent")?.contains("iPhone") == true)
         XCTAssertTrue(request.value(forHTTPHeaderField: "Accept")?.contains("image/") == true)
         XCTAssertEqual(request.cachePolicy, .returnCacheDataElseLoad)
@@ -81,7 +125,7 @@ final class MyVideoItemURLTests: XCTestCase {
         let requestCounter = LockedCounter()
         PosterImageURLProtocol.setHandler { request in
             let requestCount = requestCounter.increment()
-            XCTAssertEqual(request.value(forHTTPHeaderField: "Referer"), "https://m.yfsp.tv/")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Referer"), "https://m.yifan.tv/")
             let statusCode = requestCount == 1 ? 503 : 200
             let response = try XCTUnwrap(HTTPURLResponse(
                 url: request.url ?? url,
@@ -243,10 +287,10 @@ final class MyVideoItemURLTests: XCTestCase {
     @MainActor
     func testWebsiteFallbackRejectsUnsafeProviderURLValues() {
         let unsafeURLs = [
-            "http://m.yfsp.tv/play/media-key",
+            "http://m.yifan.tv/play/media-key",
             "https://example.com/play/media-key",
-            "https://user:password@m.yfsp.tv/play/media-key",
-            "https://m.yfsp.tv:8443/play/media-key",
+            "https://user:password@m.yifan.tv/play/media-key",
+            "https://m.yifan.tv:8443/play/media-key",
             "data:text/html,<script>alert(1)</script>",
             "about:blank"
         ]

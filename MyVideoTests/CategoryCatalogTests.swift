@@ -12,9 +12,9 @@ final class CategoryCatalogContractTests: XCTestCase {
             return PlaybackCertificate(publicKey: "public", privateKey: "private")
         }
 
-        async let first = cache.certificate(for: "yfsp.tv", load: load)
-        async let second = cache.certificate(for: "yfsp.tv", load: load)
-        async let third = cache.certificate(for: "yfsp.tv", load: load)
+        async let first = cache.certificate(for: "yifan.tv", load: load)
+        async let second = cache.certificate(for: "yifan.tv", load: load)
+        async let third = cache.certificate(for: "yifan.tv", load: load)
         let certificates = try await [first, second, third]
         let loadCount = await counter.value()
 
@@ -49,14 +49,14 @@ final class CategoryCatalogContractTests: XCTestCase {
             query: query,
             page: 2,
             pageSize: 24,
-            siteHost: "www.yfsp.tv",
+            siteHost: "www.yifan.tv",
             certificate: certificate
         )
         let components = try XCTUnwrap(URLComponents(url: url, resolvingAgainstBaseURL: false))
         let values = Dictionary(uniqueKeysWithValues: (components.queryItems ?? []).map { ($0.name, $0.value ?? "") })
 
         XCTAssertEqual(components.scheme, "https")
-        XCTAssertEqual(components.host, "m10.yfsp.tv")
+        XCTAssertEqual(components.host, "m10.yifan.tv")
         XCTAssertEqual(components.path, "/api/list/Search")
         XCTAssertEqual(values["cinema"], "1")
         XCTAssertEqual(values["page"], "2")
@@ -171,7 +171,7 @@ final class CategoryCatalogContractTests: XCTestCase {
             query: CatalogQuery(category: .movie),
             page: 0,
             pageSize: 24,
-            siteHost: "www.yfsp.tv",
+            siteHost: "www.yifan.tv",
             certificate: certificate
         ))
         XCTAssertThrowsError(try CategoryCatalogRequestBuilder.makeURL(
@@ -189,7 +189,7 @@ final class CategoryCatalogContractTests: XCTestCase {
         let data = catalogSearchResponse(count: 48, maxPage: 2, items: [[
             "key": "drama-42",
             "title": "The Test Series",
-            "image": "//static.yfsp.tv/drama-42.jpg",
+            "image": "//static.yifan.tv/drama-42.jpg",
             "lastName": "更新至 12 集",
             "lastKey": "episode-12",
             "isSerial": true,
@@ -223,8 +223,8 @@ final class CategoryCatalogContractTests: XCTestCase {
         XCTAssertEqual(item.popularity, 123456)
         XCTAssertEqual(item.rating, "9.1")
         XCTAssertEqual(item.score, 9.6)
-        XCTAssertEqual(item.thumbnailURL?.absoluteString, "https://static.yfsp.tv/drama-42.jpg")
-        XCTAssertEqual(item.playURL.absoluteString, "https://m.yfsp.tv/play/drama-42")
+        XCTAssertEqual(item.thumbnailURL?.absoluteString, "https://static.yifan.tv/drama-42.jpg")
+        XCTAssertEqual(item.playURL.absoluteString, "https://m.yifan.tv/play/drama-42")
         XCTAssertEqual(page.totalCount, 48)
         XCTAssertFalse(page.isLastPage)
     }
@@ -233,7 +233,7 @@ final class CategoryCatalogContractTests: XCTestCase {
         let invalidEnvelope = Data(#"{"ret":500,"data":{"code":0,"info":[]}}"#.utf8)
         let malformed = catalogSearchResponse(items: [["key": "", "title": "Missing key"]])
         let insecureArtwork = catalogSearchResponse(items: [[
-            "key": "movie-1", "title": "Movie", "image": "http://static.yfsp.tv/poster.jpg"
+            "key": "movie-1", "title": "Movie", "image": "http://static.yifan.tv/poster.jpg"
         ]])
         let privateArtwork = catalogSearchResponse(items: [[
             "key": "movie-2", "title": "Private", "image": "https://192.168.1.20/poster.jpg"

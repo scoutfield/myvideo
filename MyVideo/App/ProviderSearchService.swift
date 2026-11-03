@@ -122,7 +122,7 @@ struct ProviderSearchService: @unchecked Sendable, ProviderSearchServing {
     init(
         session: URLSession? = nil,
         certificateCache: ProviderCertificateCache = .shared,
-        siteURL: URL = URL(string: "https://m.yfsp.tv")!
+        siteURL: URL = ProviderSite.mobileURL
     ) {
         self.session = session ?? ProviderSessionFactory.make()
         self.certificateCache = certificateCache
@@ -184,7 +184,7 @@ struct ProviderSearchService: @unchecked Sendable, ProviderSearchServing {
             request.cachePolicy = .reloadIgnoringLocalCacheData
             let (data, response) = try await session.data(for: request)
             try Self.validate(response: response, data: data, maximumSize: 1_000_000)
-            return try PlaybackCertificateParser.parse(data)
+            return try await ProviderBootstrap.certificate(pageData: data, pageURL: siteURL, session: session)
         }
         let apiURL = try ProviderSearchRequestBuilder.makeURL(
             query: query,

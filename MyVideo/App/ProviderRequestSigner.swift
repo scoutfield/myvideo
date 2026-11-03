@@ -1,6 +1,73 @@
 import CryptoKit
 import Foundation
 
+enum ProviderSite {
+    static let mobileURL = URL(string: "https://m.yifan.tv")!
+
+    // Resolve persisted legacy links at use time; keep Saved/Played identities intact.
+    static func currentURL(_ url: URL) -> URL {
+        guard let host = url.host?.lowercased(),
+              host == "yfsp.tv" || host.hasSuffix(".yfsp.tv"),
+              var components = URLComponents(url: url, resolvingAgainstBaseURL: false) else { return url }
+        components.host = String(host.dropLast("yfsp.tv".count)) + "yifan.tv"
+        return components.url ?? url
+    }
+}
+
+enum ProviderBootstrap {
+    static func configurationURL(domain: String, now: Date = Date()) throws -> URL {
+        guard RemoteResourceHostValidator.matchingProviderDomain(for: domain) == domain else {
+            throw NativePlaybackError.unsupportedSite
+        }
+        let timestamp = String(Int(now.timeIntervalSince1970))
+        let parameters = [
+            URLQueryItem(name: "cinema", value: "1"),
+            URLQueryItem(name: "System", value: "h5"),
+            URLQueryItem(name: "AppVersion", value: "1.0"),
+            URLQueryItem(name: "SystemVersion", value: "h5"),
+            URLQueryItem(name: "version", value: "H3"),
+            URLQueryItem(name: "v", value: "1"),
+            URLQueryItem(name: "i18n", value: "0"),
+            URLQueryItem(name: "pub", value: timestamp)
+        ]
+        let query = parameters.map { "\($0.name)=\($0.value ?? "")" }.joined(separator: "&")
+        // Public web-client bootstrap protocol; no account or persisted certificate.
+        let source = timestamp + "&" + query.lowercased() + "&5569958*1"
+        let signature = Insecure.MD5.hash(data: Data(source.utf8)).map { String(format: "%02x", $0) }.joined()
+        var components = URLComponents()
+        components.scheme = "https"
+        components.host = "api.\(domain)"
+        components.path = "/api/home/config"
+        components.queryItems = parameters + [URLQueryItem(name: "vv", value: signature)]
+        guard let url = components.url else { throw NativePlaybackError.invalidResponse }
+        return url
+    }
+
+    static func certificate(pageData: Data, pageURL: URL, session: URLSession) async throws -> PlaybackCertificate {
+        do { return try PlaybackCertificateParser.parse(pageData) }
+        catch NativePlaybackError.missingConfiguration {
+            guard let host = pageURL.host,
+                  let domain = RemoteResourceHostValidator.matchingProviderDomain(for: host),
+                  domain == "yifan.tv" else { throw NativePlaybackError.missingConfiguration }
+            var request = URLRequest(url: try configurationURL(domain: domain))
+            request.timeoutInterval = 20
+            request.cachePolicy = .reloadIgnoringLocalCacheData
+            request.setValue(pageURL.absoluteString, forHTTPHeaderField: "Referer")
+            let (data, response) = try await session.data(for: request)
+            guard let response = response as? HTTPURLResponse,
+                  response.statusCode == 200, response.url?.scheme == "https",
+                  response.url?.host == "api.\(domain)", data.count <= 1_000_000,
+                  let root = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  (root["ret"] as? Int) == 200 else { throw NativePlaybackError.invalidResponse }
+            // Reuse the existing bounded certificate extraction for both bootstrap shapes.
+            var wrapped = Data("var injectJson = ".utf8)
+            wrapped.append(try JSONSerialization.data(withJSONObject: root))
+            wrapped.append(Data(";".utf8))
+            return try PlaybackCertificateParser.parse(wrapped)
+        }
+    }
+}
+
 final class ProviderSessionDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
     func urlSession(
         _ session: URLSession,

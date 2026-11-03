@@ -106,14 +106,14 @@ final class NativePlaybackResolverTests: XCTestCase {
 
         let url = try NativePlaybackRequestBuilder.makeURL(
             mediaKey: "media-key",
-            siteHost: "www.yfsp.tv",
+            siteHost: "www.yifan.tv",
             certificate: certificate
         )
         let components = try XCTUnwrap(URLComponents(url: url, resolvingAgainstBaseURL: false))
         let values = Dictionary(uniqueKeysWithValues: (components.queryItems ?? []).map { ($0.name, $0.value ?? "") })
 
         XCTAssertEqual(components.scheme, "https")
-        XCTAssertEqual(components.host, "m10.yfsp.tv")
+        XCTAssertEqual(components.host, "m10.yifan.tv")
         XCTAssertEqual(components.path, "/v3/video/play")
         XCTAssertEqual(values["id"], "media-key")
         XCTAssertEqual(values["a"], "1")
@@ -137,13 +137,13 @@ final class NativePlaybackResolverTests: XCTestCase {
         let certificate = PlaybackCertificate(publicKey: "public-test", privateKey: "private-test")
         let playbackURL = try NativePlaybackRequestBuilder.makeURL(
             mediaKey: "media-key",
-            siteHost: "m.yfsp.tv",
+            siteHost: "m.yifan.tv",
             certificate: certificate,
             region: "ca"
         )
         let detailURL = try NativePlaybackRequestBuilder.makeDetailURL(
             mediaKey: "media-key",
-            siteHost: "m.yfsp.tv",
+            siteHost: "m.yifan.tv",
             certificate: certificate,
             region: "ca"
         )
@@ -158,14 +158,14 @@ final class NativePlaybackResolverTests: XCTestCase {
     func testCertificateCacheInvalidationForcesFreshLoad() async throws {
         let cache = ProviderCertificateCache()
         let loadCount = LockedCounter()
-        let first = try await cache.certificate(for: "yfsp.tv") {
+        let first = try await cache.certificate(for: "yifan.tv") {
             let value = loadCount.increment()
             return PlaybackCertificate(publicKey: "public-\(value)", privateKey: "private-\(value)")
         }
 
-        await cache.invalidate(for: "yfsp.tv")
+        await cache.invalidate(for: "yifan.tv")
 
-        let second = try await cache.certificate(for: "yfsp.tv") {
+        let second = try await cache.certificate(for: "yifan.tv") {
             let value = loadCount.increment()
             return PlaybackCertificate(publicKey: "public-\(value)", privateKey: "private-\(value)")
         }
@@ -179,7 +179,7 @@ final class NativePlaybackResolverTests: XCTestCase {
         let cache = ProviderCertificateCache()
         let loadCount = LockedCounter()
         let staleTask = Task {
-            try await cache.certificate(for: "yfsp.tv") {
+            try await cache.certificate(for: "yifan.tv") {
                 _ = loadCount.increment()
                 try? await Task.sleep(for: .milliseconds(80))
                 return PlaybackCertificate(publicKey: "stale", privateKey: "stale")
@@ -190,8 +190,8 @@ final class NativePlaybackResolverTests: XCTestCase {
         }
         XCTAssertEqual(loadCount.value, 1)
 
-        await cache.invalidate(for: "yfsp.tv")
-        let fresh = try await cache.certificate(for: "yfsp.tv") {
+        await cache.invalidate(for: "yifan.tv")
+        let fresh = try await cache.certificate(for: "yifan.tv") {
             PlaybackCertificate(publicKey: "fresh", privateKey: "fresh")
         }
 
@@ -201,7 +201,7 @@ final class NativePlaybackResolverTests: XCTestCase {
         } catch is CancellationError {
             // Expected: an invalidated load cannot become cache state again.
         }
-        let cached = try await cache.certificate(for: "yfsp.tv") {
+        let cached = try await cache.certificate(for: "yifan.tv") {
             XCTFail("Fresh certificate should remain cached")
             return PlaybackCertificate(publicKey: "unexpected", privateKey: "unexpected")
         }
@@ -215,13 +215,13 @@ final class NativePlaybackResolverTests: XCTestCase {
 
         let detailURL = try NativePlaybackRequestBuilder.makeDetailURL(
             mediaKey: "series-key",
-            siteHost: "m.yfsp.tv",
+            siteHost: "m.yifan.tv",
             certificate: certificate
         )
         let playlistURL = try NativePlaybackRequestBuilder.makePlaylistURL(
             seriesKey: "series-key",
             categoryID: "0,1,4,137",
-            siteHost: "m.yfsp.tv",
+            siteHost: "m.yifan.tv",
             certificate: certificate
         )
 
@@ -237,7 +237,7 @@ final class NativePlaybackResolverTests: XCTestCase {
         let url = try NativePlaybackRequestBuilder.makeURL(
             mediaKey: "episode-key",
             albumMode: false,
-            siteHost: "m.yfsp.tv",
+            siteHost: "m.yifan.tv",
             certificate: certificate
         )
         let queryItems = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems
@@ -249,7 +249,7 @@ final class NativePlaybackResolverTests: XCTestCase {
         let item = MyVideoItem(
             listPath: "media-key",
             title: "Cleartext",
-            url: "http://m.yfsp.tv/play/media-key"
+            url: "http://m.yifan.tv/play/media-key"
         )
 
         XCTAssertThrowsError(try NativePlaybackResolver.validatePage(item)) { error in
@@ -460,7 +460,7 @@ final class NativePlaybackResolverTests: XCTestCase {
         let item = MyVideoItem(
             listPath: "series-key",
             title: "Ten Episode Series",
-            url: "https://m.yfsp.tv/play/series-key",
+            url: "https://m.yifan.tv/play/series-key",
             isSerial: true,
             latestEpisodeKey: "episode-10",
             latestEpisodeTitle: "10"
@@ -528,7 +528,7 @@ final class NativePlaybackResolverTests: XCTestCase {
         let item = MyVideoItem(
             listPath: "movie-key",
             title: "Movie",
-            url: "https://m.yfsp.tv/play/movie-key",
+            url: "https://m.yifan.tv/play/movie-key",
             isSerial: false,
             latestEpisodeKey: "quality-row",
             latestEpisodeTitle: "576P"
@@ -600,7 +600,7 @@ final class NativePlaybackResolverTests: XCTestCase {
         let item = MyVideoItem(
             listPath: "NjvfTz4MVG6",
             title: "披荆斩棘2026",
-            url: "https://m.yfsp.tv/play/NjvfTz4MVG6",
+            url: "https://m.yifan.tv/play/NjvfTz4MVG6",
             isSerial: true
         )
 
@@ -651,7 +651,7 @@ final class NativePlaybackResolverTests: XCTestCase {
         let item = MyVideoItem(
             listPath: "series-key",
             title: "Series",
-            url: "https://m.yfsp.tv/play/series-key",
+            url: "https://m.yifan.tv/play/series-key",
             isSerial: true
         )
 
@@ -696,7 +696,7 @@ final class NativePlaybackResolverTests: XCTestCase {
         let item = MyVideoItem(
             listPath: "series-key",
             title: "Series",
-            url: "https://m.yfsp.tv/play/series-key",
+            url: "https://m.yifan.tv/play/series-key",
             isSerial: true
         )
 
@@ -740,7 +740,7 @@ final class NativePlaybackResolverTests: XCTestCase {
         let item = MyVideoItem(
             listPath: "series-key",
             title: "Series",
-            url: "https://m.yfsp.tv/play/series-key",
+            url: "https://m.yifan.tv/play/series-key",
             isSerial: true
         )
 
@@ -786,7 +786,7 @@ final class NativePlaybackResolverTests: XCTestCase {
         let item = MyVideoItem(
             listPath: "movie-key",
             title: "Login Required",
-            url: "https://m.yfsp.tv/play/movie-key"
+            url: "https://m.yifan.tv/play/movie-key"
         )
 
         do {
@@ -812,7 +812,7 @@ final class NativePlaybackResolverTests: XCTestCase {
         let item = MyVideoItem(
             listPath: "movie-key",
             title: "Cancelled",
-            url: "https://m.yfsp.tv/play/movie-key"
+            url: "https://m.yifan.tv/play/movie-key"
         )
 
         do {
@@ -865,7 +865,7 @@ final class NativePlaybackResolverTests: XCTestCase {
         let item = MyVideoItem(
             listPath: "series-key",
             title: "Ten Episode Series",
-            url: "https://m.yfsp.tv/play/series-key",
+            url: "https://m.yifan.tv/play/series-key",
             isSerial: true,
             latestEpisodeKey: "episode-10",
             latestEpisodeTitle: "10"
@@ -917,7 +917,7 @@ final class NativePlaybackResolverTests: XCTestCase {
         let item = MyVideoItem(
             listPath: "series-key",
             title: "Series",
-            url: "https://m.yfsp.tv/play/series-key",
+            url: "https://m.yifan.tv/play/series-key",
             isSerial: true,
             latestEpisodeKey: "episode-10",
             latestEpisodeTitle: "10"
@@ -951,7 +951,7 @@ final class NativePlaybackResolverTests: XCTestCase {
         let item = MyVideoItem(
             listPath: "series-key",
             title: "Redirected",
-            url: "https://m.yfsp.tv/play/series-key"
+            url: "https://m.yifan.tv/play/series-key"
         )
 
         do {
@@ -1198,8 +1198,8 @@ final class NativePlaybackResolverTests: XCTestCase {
 
     func testProviderSessionDelegateAllowsOnlyHTTPSProviderRedirects() throws {
         let delegate = ProviderSessionDelegate()
-        let originalURL = try XCTUnwrap(URL(string: "https://m.yfsp.tv/v3/video/detail"))
-        let allowedURL = try XCTUnwrap(URL(string: "https://www.yfsp.tv/v3/video/detail"))
+        let originalURL = try XCTUnwrap(URL(string: "https://m.yifan.tv/v3/video/detail"))
+        let allowedURL = try XCTUnwrap(URL(string: "https://www.yifan.tv/v3/video/detail"))
         let blockedURL = try XCTUnwrap(URL(string: "https://attacker.invalid/redirected"))
         let response = try XCTUnwrap(HTTPURLResponse(
             url: originalURL,

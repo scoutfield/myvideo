@@ -902,7 +902,7 @@ struct NativePlaybackResolver: NativePlaybackResolving, EpisodePlaylistResolving
             request.cachePolicy = .reloadIgnoringLocalCacheData
             let (data, response) = try await session.data(for: request)
             try validate(response, maximumBytes: 1_000_000, actualBytes: data.count)
-            return try PlaybackCertificateParser.parse(data)
+            return try await ProviderBootstrap.certificate(pageData: data, pageURL: item.playURL, session: session)
         }
     }
 

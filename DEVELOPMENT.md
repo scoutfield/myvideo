@@ -575,3 +575,16 @@ A change is complete only when:
 - Documentation reflects changed decisions without embedding volatile evidence.
 - The committed revision matches the pushed revision and, when requested, the
   revision installed on the device.
+
+### Active provider origin
+
+Use `https://m.yifan.tv` for new provider pages, catalog origins, search, and
+artwork referers. Stored `yfsp.tv` links are mapped by exact domain suffix to
+`yifan.tv` when resolving URLs; preserve IDs and progress data. Keep legacy
+allowlist coverage for persisted data. Empty injected page configuration on
+`yifan.tv` uses the public `/api/home/config` web bootstrap on `api.yifan.tv`;
+validate HTTPS, final host, status, and response size before certificate parsing.
+Genre requests include `cinema=1`. Never log bootstrap certificates or signed
+media URLs. The opt-in `testLiveYifanCatalogSearchAndPlayback` runs with
+`TEST_RUNNER_MYVIDEO_LIVE_PROVIDER=1` supplied to xcodebuild; keep normal unit/UI
+runs offline and deterministic.

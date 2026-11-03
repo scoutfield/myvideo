@@ -23,7 +23,7 @@ final class ProviderSearchContractTests: XCTestCase {
             query: query,
             page: 2,
             pageSize: 24,
-            siteHost: "www.yfsp.tv",
+            siteHost: "www.yifan.tv",
             certificate: certificate
         )
         let components = try XCTUnwrap(URLComponents(url: url, resolvingAgainstBaseURL: false))
@@ -31,7 +31,7 @@ final class ProviderSearchContractTests: XCTestCase {
         let values = Dictionary(uniqueKeysWithValues: queryItems.map { ($0.name, $0.value ?? "") })
 
         XCTAssertEqual(components.scheme, "https")
-        XCTAssertEqual(components.host, "m10.yfsp.tv")
+        XCTAssertEqual(components.host, "m10.yifan.tv")
         XCTAssertEqual(components.path, "/api/list/Search")
         XCTAssertEqual(queryItems.prefix(10).map(\.name), [
             "cinema", "page", "size", "orderby", "desc", "cid", "tags", "isserial", "isIndex", "isfree"
@@ -60,7 +60,7 @@ final class ProviderSearchContractTests: XCTestCase {
                 query: query,
                 page: page,
                 pageSize: pageSize,
-                siteHost: "www.yfsp.tv",
+                siteHost: "www.yifan.tv",
                 certificate: certificate
             ))
         }
@@ -87,12 +87,12 @@ final class ProviderSearchContractTests: XCTestCase {
         let page = try ProviderSearchResponseDecoder.decode(data, page: 1, pageSize: 24)
 
         XCTAssertEqual(page.items.map(\.id), ["variety-first", "movie-second", "series-third", "anime-fourth"])
-        XCTAssertEqual(page.items.first?.playURL.absoluteString, "https://m.yfsp.tv/play/variety-first")
+        XCTAssertEqual(page.items.first?.playURL.absoluteString, "https://m.yifan.tv/play/variety-first")
         XCTAssertEqual(page.items.first?.latestEpisodeKey, "episode-12")
         XCTAssertEqual(page.items.first?.latestEpisodeTitle, "第12期")
         XCTAssertEqual(page.items.first?.quality, "4K")
         XCTAssertEqual(page.items.first?.score, 9.6)
-        XCTAssertEqual(page.items.first?.thumbnailURL?.absoluteString, "https://static.yfsp.tv/variety-first.jpg")
+        XCTAssertEqual(page.items.first?.thumbnailURL?.absoluteString, "https://static.yifan.tv/variety-first.jpg")
         XCTAssertEqual(page.totalCount, 5)
         XCTAssertFalse(page.isLastPage)
     }
@@ -104,7 +104,7 @@ final class ProviderSearchContractTests: XCTestCase {
         let insecureArtwork = Self.searchResponse(items: [[
             "key": "movie-safe",
             "title": "Bad image",
-            "image": "http://static.yfsp.tv/poster.jpg",
+            "image": "http://static.yifan.tv/poster.jpg",
             "videoClassID": "0,1,3"
         ]])
 
@@ -126,7 +126,7 @@ final class ProviderSearchContractTests: XCTestCase {
 
     func testServiceUsesValidatedSignedTransportWithoutPersistingRequestSecrets() async throws {
         let cache = ProviderCertificateCache(lifetime: 60)
-        _ = try await cache.certificate(for: "yfsp.tv") {
+        _ = try await cache.certificate(for: "yifan.tv") {
             PlaybackCertificate(publicKey: "public-test", privateKey: "private-test")
         }
         let observation = SearchRequestObservation()
@@ -165,14 +165,40 @@ final class ProviderSearchContractTests: XCTestCase {
 
         XCTAssertEqual(page.items.map(\.id), ["movie-live"])
         XCTAssertEqual(observation.path, "/api/list/Search")
-        XCTAssertEqual(observation.host, "m10.yfsp.tv")
+        XCTAssertEqual(observation.host, "m10.yifan.tv")
         XCTAssertEqual(observation.tags, "Live")
-        XCTAssertEqual(observation.referer, "https://m.yfsp.tv")
+        XCTAssertEqual(observation.referer, "https://m.yifan.tv")
+    }
+
+    func testServiceBootstrapsCertificateWhenNewSitePageHasEmptyInjectJSON() async throws {
+        let cache = ProviderCertificateCache()
+        let observation = SearchRequestObservation()
+        SearchURLProtocol.setHandler { request in
+            let url = try XCTUnwrap(request.url)
+            let response = try XCTUnwrap(HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil))
+            if url.host == "m.yifan.tv" {
+                return (response, Data("<script>var injectJson = {};</script>".utf8))
+            }
+            if url.host == "api.yifan.tv" {
+                XCTAssertEqual(url.path, "/api/home/config")
+                return (response, Data(#"{"ret":200,"data":{"list":{"pConfig":{"publicKey":"test-public","privateKey":["test-private"]}}}}"#.utf8))
+            }
+            observation.record(path: url.path, host: url.host, tags: nil, referer: nil)
+            return (response, Self.searchResponse(items: [Self.item(key: "bootstrapped", title: "Title", categoryPath: "0,1,3")]))
+        }
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [SearchURLProtocol.self]
+        let session = URLSession(configuration: configuration)
+        defer { session.invalidateAndCancel() }
+        let service = ProviderSearchService(session: session, certificateCache: cache)
+        let page = try await service.search(query: ProviderSearchQuery(validating: "Title"), page: 1, pageSize: 24)
+        XCTAssertEqual(page.items.map(\.id), ["bootstrapped"])
+        XCTAssertEqual(observation.host, "m10.yifan.tv")
     }
 
     func testServiceRejectsSuccessfulResponseFromUnsupportedFinalHost() async throws {
         let cache = ProviderCertificateCache(lifetime: 60)
-        _ = try await cache.certificate(for: "yfsp.tv") {
+        _ = try await cache.certificate(for: "yifan.tv") {
             PlaybackCertificate(publicKey: "public-test", privateKey: "private-test")
         }
         SearchURLProtocol.setHandler { _ in
@@ -258,7 +284,7 @@ final class ProviderSearchContractTests: XCTestCase {
         [
             "key": key,
             "title": title,
-            "image": "//static.yfsp.tv/\(key).jpg",
+            "image": "//static.yifan.tv/\(key).jpg",
             "lastName": "第12期",
             "lastKey": "episode-12",
             "isSerial": true,

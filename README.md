@@ -73,3 +73,8 @@ pod install
 ## Notes
 
 Background refresh timing is controlled by iOS. A cold launch refreshes Home and Saved; later foreground returns use a 15-minute freshness window, while daily background work remains a best-effort notification safety net. Background audio, Picture in Picture, notifications, iCloud, AirPlay, and Google Cast require physical-device verification. The iOS Simulator cannot discover or validate real receivers.
+
+The active provider is `m.yifan.tv`. Legacy `yfsp.tv` links in saved titles,
+playback history, and artwork resolve through `yifan.tv` at use time without
+changing library identifiers. If a page has no embedded playback configuration,
+the app obtains the public configuration from the provider's web API.

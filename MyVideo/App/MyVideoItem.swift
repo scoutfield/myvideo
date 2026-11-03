@@ -144,7 +144,7 @@ struct MyVideoItem: Codable, Equatable, Identifiable, Sendable {
             .replacingOccurrences(of: "/play/", with: "")
             .trimmingCharacters(in: CharacterSet(charactersIn: "/"))
 
-        return URL(string: "https://m.yfsp.tv/play/\(mediaKey)")!
+        return URL(string: "https://m.yifan.tv/play/\(mediaKey)")!
     }
 
     private static func siteURL(from rawValue: String?) -> URL? {
@@ -158,15 +158,15 @@ struct MyVideoItem: Codable, Equatable, Identifiable, Sendable {
         }
 
         if value.hasPrefix("//") {
-            return URL(string: "https:\(value)")
+            return URL(string: "https:\(value)").map(ProviderSite.currentURL)
         }
 
         if value.hasPrefix("http://") || value.hasPrefix("https://") || value.hasPrefix("about:") || value.hasPrefix("data:") {
-            return URL(string: value)
+            return URL(string: value).map(ProviderSite.currentURL)
         }
 
         if value.hasPrefix("/") {
-            return URL(string: "https://m.yfsp.tv\(value)")
+            return URL(string: "https://m.yifan.tv\(value)")
         }
 
         return nil

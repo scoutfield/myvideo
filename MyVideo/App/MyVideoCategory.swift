@@ -52,13 +52,13 @@ enum MyVideoCategory: String, CaseIterable, Codable, Hashable, Identifiable, Sen
     var url: URL {
         switch self {
         case .movie:
-            URL(string: "https://m.yfsp.tv/list/movie")!
+            URL(string: "https://m.yifan.tv/list/movie")!
         case .drama:
-            URL(string: "https://m.yfsp.tv/list/drama")!
+            URL(string: "https://m.yifan.tv/list/drama")!
         case .variety:
-            URL(string: "https://m.yfsp.tv/list/variety")!
+            URL(string: "https://m.yifan.tv/list/variety")!
         case .anime:
-            URL(string: "https://m.yfsp.tv/list/anime")!
+            URL(string: "https://m.yifan.tv/list/anime")!
         }
     }
 }

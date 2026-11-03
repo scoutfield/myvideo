@@ -332,7 +332,7 @@ enum CategoryCatalogMetadataRequestBuilder {
     ) throws -> URL {
         try ProviderRequestSigner.makeSignedURL(
             path: category.genreEndpointPath,
-            parameters: [],
+            parameters: [URLQueryItem(name: "cinema", value: "1")],
             siteHost: siteHost,
             certificate: certificate
         )
@@ -666,7 +666,7 @@ struct CategoryCatalogService: @unchecked Sendable, CategoryCatalogServing {
         return try await certificateCache.certificate(for: domain) {
             let (data, response) = try await session.data(from: category.url)
             try validate(response: response, data: data, maximumSize: 1_000_000)
-            return try PlaybackCertificateParser.parse(data)
+            return try await ProviderBootstrap.certificate(pageData: data, pageURL: category.url, session: session)
         }
     }
 
