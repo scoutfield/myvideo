@@ -590,7 +590,10 @@ media URLs. The opt-in `testLiveYifanCatalogSearchAndPlayback` runs with
 runs offline and deterministic.
 
 Short Drama uses category `0,1,8` and Documentary uses `0,1,7`. Both participate
-in Home, native catalogs, search, caching, and Saved/playback flows. Short Drama
+in Home, native catalogs, search, caching, and Saved/playback flows. Treat both
+as episode-based categories through the shared Series/Anime playback intent,
+including when the provider reports isSerial=false. Reuse the existing episode
+picker, progress, skip controls, and saved-update resolver. Short Drama
 has no public genre endpoint; omit only its genre picker and keep common provider
 filters. Documentary genres use `/api/list/DocumentaryType`. Recommendation
 eligibility remains Movies/Series/Anime until separate rules are requested.

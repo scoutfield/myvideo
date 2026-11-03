@@ -37,6 +37,19 @@ final class NativePlaybackResolverTests: XCTestCase {
         })
     }
 
+    func testShortDramaAndDocumentariesUseEpisodeIntentDespiteFalseProviderFlag() async throws {
+        for category in [MyVideoCategory.shortDrama, .documentary] {
+            let item = MyVideoItem(listPath: "episode-title", title: category.title,
+                isSerial: false, categoryPath: category.catalogCID + ",70")
+            XCTAssertTrue(SerialPlaybackIntent.infer(providerIsSerial: false, item: item))
+            let playback = try await FixtureNativePlaybackResolver().resolve(item: item, preferredEpisodeKey: nil)
+            XCTAssertNotNil(playback.selectedEpisode)
+            XCTAssertFalse(playback.episodes.isEmpty)
+            let snapshots = try await FixtureNativePlaybackResolver().episodesForSavedUpdate(for: item, expectedEpisodeKey: nil)
+            XCTAssertFalse(snapshots?.isEmpty ?? true)
+        }
+    }
+
     func testSerialIntentUsesProviderItemEpisodeAndCategorySignals() {
         XCTAssertTrue(SerialPlaybackIntent.infer(
             providerIsSerial: true,

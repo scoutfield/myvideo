@@ -60,7 +60,13 @@ final class MyVideoItemURLTests: XCTestCase {
             if category == .drama { serial = page.items.first }
             if category == .shortDrama || category == .documentary {
                 let title = try XCTUnwrap(page.items.first)
-                _ = try await NativePlaybackResolver().resolve(item: title, preferredEpisodeKey: nil)
+                let resolver = NativePlaybackResolver()
+                let episodes = try await resolver.loadEpisodes(for: title, expectedEpisodeKey: title.latestEpisodeKey)
+                XCTAssertFalse(episodes.isEmpty)
+                let playback = try await resolver.resolve(item: title, preferredEpisodeKey: episodes.first?.mediaKey)
+                XCTAssertNotNil(playback.selectedEpisode)
+                let savedEpisodes = try await resolver.episodesForSavedUpdate(for: title, expectedEpisodeKey: title.latestEpisodeKey)
+                XCTAssertFalse(savedEpisodes?.isEmpty ?? true)
             }
         }
         let found = try await ProviderSearchService().search(query: ProviderSearchQuery(validating: "沧元图"), page: 1, pageSize: 8)

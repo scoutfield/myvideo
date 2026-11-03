@@ -228,6 +228,16 @@ final class ReadyToWatchProjectorTests: XCTestCase {
                             duration: 0, playedAt: 200)], overrides: pins).count, 1)
     }
 
+    func testNewSeriesCategoriesRequireEpisodeProgressEvenWithFalseSerialFlag() {
+        for category in [MyVideoCategory.shortDrama, .documentary] {
+            let show = MyVideoItem(listPath: category.id, title: category.title,
+                isSerial: false, categoryPath: category.catalogCID)
+            XCTAssertTrue(project(saved: [show], played: [record(show, episode: nil, position: 20, playedAt: 900)]).isEmpty)
+            let entries = project(saved: [show], played: [record(show, episode: "02", position: 20, playedAt: 900)])
+            XCTAssertEqual(entries.map(\.episodeKey), ["02"])
+        }
+    }
+
     private func project(
         saved: [MyVideoItem],
         updates: [ReadyToWatchUpdate] = [],

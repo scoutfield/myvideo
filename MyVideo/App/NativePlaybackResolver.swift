@@ -107,7 +107,7 @@ enum SerialPlaybackIntent {
 
     private static func isSerialCategory(_ categoryPath: String?) -> Bool {
         let categoryParts = categoryPath?.split(separator: ",").map(String.init) ?? []
-        return categoryParts.count >= 3 && ["4", "5", "6"].contains(categoryParts[2])
+        return categoryParts.count >= 3 && ["4", "5", "6", "7", "8"].contains(categoryParts[2])
     }
 }
 
@@ -1004,7 +1004,7 @@ struct FixtureNativePlaybackResolver: NativePlaybackResolving, EpisodePlaylistRe
     }
 
     func resolve(item: MyVideoItem, preferredEpisodeKey: String?) async throws -> NativePlayback {
-        let isSerial = item.isSerial == true || item.latestEpisodeKey != nil || preferredEpisodeKey != nil
+        let isSerial = SerialPlaybackIntent.infer(providerIsSerial: false, item: item, preferredEpisodeKey: preferredEpisodeKey)
         let episodes = [
             Episode(mediaKey: "episode-10", title: "10", updateDate: "2026-09-07T10:00:00Z"),
             Episode(mediaKey: "episode-4", title: "04", updateDate: "2026-09-06T15:00:00Z"),
@@ -1036,13 +1036,13 @@ struct FixtureNativePlaybackResolver: NativePlaybackResolving, EpisodePlaylistRe
         for item: MyVideoItem,
         expectedEpisodeKey: String?
     ) async throws -> [EpisodeSelection]? {
-        guard item.isSerial == true || item.latestEpisodeKey != nil else { return nil }
+        guard SerialPlaybackIntent.infer(providerIsSerial: false, item: item) else { return nil }
         return try await loadEpisodes(for: item, expectedEpisodeKey: expectedEpisodeKey)
             .map { EpisodeSelection(mediaKey: $0.mediaKey, title: $0.title, updateDate: $0.updateDate) }
     }
 
     func loadEpisodes(for item: MyVideoItem, expectedEpisodeKey: String?) async throws -> [Episode] {
-        guard item.isSerial == true || item.latestEpisodeKey != nil || expectedEpisodeKey != nil else {
+        guard SerialPlaybackIntent.infer(providerIsSerial: false, item: item, preferredEpisodeKey: expectedEpisodeKey) else {
             return []
         }
         return [

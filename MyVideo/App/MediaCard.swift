@@ -61,7 +61,7 @@ struct PosterCardProjection: Equatable, Sendable {
         item: MyVideoItem,
         episodeState: SavedEpisodeUpdateState?
     ) -> String? {
-        guard item.isSerial == true || episodeState != nil else { return nil }
+        guard SerialPlaybackIntent.infer(providerIsSerial: false, item: item) || episodeState != nil else { return nil }
 
         let synchronizedTitle = episodeState.flatMap { state in
             state.episodes.first(where: { $0.mediaKey == state.latestEpisodeKey })?.title

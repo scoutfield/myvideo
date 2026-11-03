@@ -2,6 +2,15 @@ import XCTest
 @testable import MyVideo
 
 final class SavedLibrarySynchronizationTests: XCTestCase {
+    func testShortDramaAndDocumentaryCardsShowSeriesEpisodeLabels() {
+        for category in [MyVideoCategory.shortDrama, .documentary] {
+            let item = MyVideoItem(listPath: "series", title: category.title,
+                isSerial: false, latestEpisodeKey: "episode-9", latestEpisodeTitle: "09",
+                categoryPath: category.catalogCID)
+            XCTAssertEqual(PosterCardProjection(item: item).detailText, "09")
+        }
+    }
+
     func testPosterProjectionHidesOpaqueEpisodeKeyAndUsesLanguageAndYear() {
         let key = "fz4AxompbuT"
         let item = MyVideoItem(

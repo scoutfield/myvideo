@@ -712,6 +712,28 @@ final class MyVideoLatestTapTests: XCTestCase {
         XCTAssertFalse(app.buttons["readyQueueItem-fixture-movie"].waitForExistence(timeout: 1))
     }
 
+    func testShortDramaAndDocumentariesReuseSeriesEpisodePicker() {
+        for category in ["short", "documentary"] {
+            let app = launchFixtureApp()
+            let item = app.buttons["latestItem-fixture-\(category)"]
+            for _ in 0..<8 {
+                if item.exists && item.isHittable { break }
+                app.swipeUp()
+            }
+            XCTAssertTrue(item.waitForExistence(timeout: 5))
+            item.tap()
+            let episodes = app.buttons["showEpisodes"]
+            XCTAssertTrue(episodes.waitForExistence(timeout: 5))
+            episodes.tap()
+            let older = app.buttons["episodeRow-episode-2"]
+            XCTAssertTrue(older.waitForExistence(timeout: 5))
+            older.tap()
+            XCTAssertTrue(episodes.waitForExistence(timeout: 5))
+            XCTAssertTrue(episodes.label.contains("2/10"))
+            app.terminate()
+        }
+    }
+
     func testEpisodePickerShowsNewestFirstAndSwitchesEpisode() {
         let app = launchFixtureApp()
         let item = app.buttons["latestItem-fixture-drama"]

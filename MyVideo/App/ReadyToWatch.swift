@@ -201,7 +201,7 @@ enum ReadyToWatchProjector {
         else {
             return false
         }
-        return item.isSerial != true || normalizedEpisodeKey(record.episodeKey) != nil
+        return !SerialPlaybackIntent.infer(providerIsSerial: false, item: item) || normalizedEpisodeKey(record.episodeKey) != nil
     }
 
     private static func isDismissed(
