@@ -27,8 +27,12 @@ final class CategoryCatalogContractTests: XCTestCase {
         XCTAssertEqual(MyVideoCategory.drama.catalogCID, "0,1,4")
         XCTAssertEqual(MyVideoCategory.variety.catalogCID, "0,1,5")
         XCTAssertEqual(MyVideoCategory.anime.catalogCID, "0,1,6")
-        XCTAssertEqual(MyVideoCategory.allCases.map(\.id), ["movie", "drama", "variety", "anime"])
-        XCTAssertEqual(MyVideoCategory.allCases.map(\.title), ["Movies", "Series", "Variety", "Anime"])
+        XCTAssertEqual(MyVideoCategory.shortDrama.catalogCID, "0,1,8")
+        XCTAssertEqual(MyVideoCategory.documentary.catalogCID, "0,1,7")
+        XCTAssertNil(MyVideoCategory.shortDrama.genreEndpointPath)
+        XCTAssertEqual(MyVideoCategory.documentary.genreEndpointPath, "/api/list/DocumentaryType")
+        XCTAssertEqual(MyVideoCategory.allCases.map(\.id), ["movie", "drama", "variety", "anime", "short", "documentary"])
+        XCTAssertEqual(MyVideoCategory.allCases.map(\.title), ["Movies", "Series", "Variety", "Anime", "Short Drama", "Documentaries"])
     }
 
     func testRequestBuilderSignsCatalogRequestDeterministically() throws {
@@ -122,6 +126,15 @@ final class CategoryCatalogContractTests: XCTestCase {
         XCTAssertEqual(filters.languages.map(\.value), ["国语", "英语"])
         XCTAssertEqual(filters.years.map(\.value), ["今年", "去年"])
         XCTAssertEqual(filters.qualities.map(\.value), ["4K", "1080P"])
+        XCTAssertEqual(filters.statuses.map(\.value), ["0", "1"])
+    }
+
+    func testShortDramaRetainsCommonFiltersWithoutGenreEndpoint() throws {
+        let filters = try CatalogFilterResponseDecoder.decode(
+            conditionData: searchConditionsResponse(), genreData: nil, category: .shortDrama
+        )
+        XCTAssertTrue(filters.genres.isEmpty)
+        XCTAssertEqual(filters.regions.map(\.value), ["大陆", "欧美"])
         XCTAssertEqual(filters.statuses.map(\.value), ["0", "1"])
     }
 

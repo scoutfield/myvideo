@@ -80,7 +80,7 @@ final class MyVideoLatestTapTests: XCTestCase {
         XCTAssertFalse(app.webViews["browserWebView"].exists)
     }
 
-    func testHomePageContainsOnlyTheFourRequestedSections() {
+    func testHomePageContainsOnlyTheSixRequestedSections() {
         let app = launchFixtureApp()
 
         XCTAssertTrue(app.images["homeScreenTitle-brandMark"].waitForExistence(timeout: 5))
@@ -101,7 +101,11 @@ final class MyVideoLatestTapTests: XCTestCase {
 
         XCTAssertTrue(app.staticTexts["Latest Variety"].waitForExistence(timeout: 2))
         XCTAssertTrue(app.staticTexts["Latest Anime"].waitForExistence(timeout: 2))
-        XCTAssertEqual(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Latest'")).count, 4)
+        app.swipeUp()
+        app.swipeUp()
+        XCTAssertTrue(app.staticTexts["Latest Short Drama"].waitForExistence(timeout: 3))
+        XCTAssertTrue(app.staticTexts["Latest Documentaries"].waitForExistence(timeout: 3))
+        XCTAssertEqual(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Latest'")).count, 6)
     }
 
     func testPopupDoesNotReplacePlaybackPage() {
@@ -392,10 +396,10 @@ final class MyVideoLatestTapTests: XCTestCase {
     func testEveryAllButtonOpensMatchingNativeCatalog() {
         let app = launchFixtureApp()
 
-        for category in ["movie", "drama", "variety", "anime"] {
+        for category in ["movie", "drama", "variety", "anime", "short", "documentary"] {
             let categoryButton = app.buttons["browseCategory-\(category)"]
-            if !categoryButton.exists {
-                app.swipeUp()
+            for _ in 0..<8 {
+                if categoryButton.exists && categoryButton.isHittable { break }
                 app.swipeUp()
             }
             XCTAssertTrue(categoryButton.waitForExistence(timeout: 3))

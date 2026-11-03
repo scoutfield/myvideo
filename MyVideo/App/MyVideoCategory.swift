@@ -5,6 +5,8 @@ enum MyVideoCategory: String, CaseIterable, Codable, Hashable, Identifiable, Sen
     case drama
     case variety
     case anime
+    case shortDrama = "short"
+    case documentary
 
     var id: String {
         rawValue
@@ -20,6 +22,10 @@ enum MyVideoCategory: String, CaseIterable, Codable, Hashable, Identifiable, Sen
             "Variety"
         case .anime:
             "Anime"
+        case .shortDrama:
+            "Short Drama"
+        case .documentary:
+            "Documentaries"
         }
     }
 
@@ -37,28 +43,25 @@ enum MyVideoCategory: String, CaseIterable, Codable, Hashable, Identifiable, Sen
             "0,1,5"
         case .anime:
             "0,1,6"
+        case .shortDrama:
+            "0,1,8"
+        case .documentary:
+            "0,1,7"
         }
     }
 
-    var genreEndpointPath: String {
+    var genreEndpointPath: String? {
         switch self {
         case .movie: "/api/list/FilmType"
         case .drama: "/api/list/TvType"
         case .variety: "/api/list/VarietyType"
         case .anime: "/api/list/AnimeType"
+        case .shortDrama: nil
+        case .documentary: "/api/list/DocumentaryType"
         }
     }
 
     var url: URL {
-        switch self {
-        case .movie:
-            URL(string: "https://m.yifan.tv/list/movie")!
-        case .drama:
-            URL(string: "https://m.yifan.tv/list/drama")!
-        case .variety:
-            URL(string: "https://m.yifan.tv/list/variety")!
-        case .anime:
-            URL(string: "https://m.yifan.tv/list/anime")!
-        }
+        ProviderSite.mobileURL.appendingPathComponent("list").appendingPathComponent(id)
     }
 }

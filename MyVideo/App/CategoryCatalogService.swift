@@ -217,7 +217,7 @@ struct CatalogFilterSet: Equatable, Sendable {
 enum CatalogFilterResponseDecoder {
     static func decode(
         conditionData: Data,
-        genreData: Data,
+        genreData: Data?,
         category: MyVideoCategory
     ) throws -> CatalogFilterSet {
         let conditionInfo = try infoArray(from: conditionData)
@@ -232,7 +232,7 @@ enum CatalogFilterResponseDecoder {
             throw CategoryCatalogError.invalidResponse
         }
 
-        let genres = try infoArray(from: genreData).map { raw -> CatalogFilterOption in
+        let genres = try (genreData.map { try infoArray(from: $0) } ?? []).map { raw -> CatalogFilterOption in
             guard
                 string(raw["pid"]) == category.catalogCID,
                 let title = string(raw["className"]),
@@ -330,8 +330,9 @@ enum CategoryCatalogMetadataRequestBuilder {
         siteHost: String,
         certificate: PlaybackCertificate
     ) throws -> URL {
-        try ProviderRequestSigner.makeSignedURL(
-            path: category.genreEndpointPath,
+        guard let path = category.genreEndpointPath else { throw CategoryCatalogError.invalidRequest }
+        return try ProviderRequestSigner.makeSignedURL(
+            path: path,
             parameters: [URLQueryItem(name: "cinema", value: "1")],
             siteHost: siteHost,
             certificate: certificate
@@ -630,17 +631,19 @@ struct CategoryCatalogService: @unchecked Sendable, CategoryCatalogServing {
             siteHost: host,
             certificate: certificate
         )
-        let genresURL = try CategoryCatalogMetadataRequestBuilder.makeGenresURL(
-            category: category,
-            siteHost: host,
-            certificate: certificate
-        )
         async let conditionData = fetch(conditionsURL, referer: category.url)
-        async let genreData = fetch(genresURL, referer: category.url)
+        let genreData: Data?
+        if category.genreEndpointPath != nil {
+            let genresURL = try CategoryCatalogMetadataRequestBuilder.makeGenresURL(
+                category: category, siteHost: host, certificate: certificate
+            )
+            genreData = try await fetch(genresURL, referer: category.url)
+        } else {
+            // Short Drama has no genre endpoint; keep the provider's common filters.
+            genreData = nil
+        }
         let filters = try await CatalogFilterResponseDecoder.decode(
-            conditionData: conditionData,
-            genreData: genreData,
-            category: category
+            conditionData: conditionData, genreData: genreData, category: category
         )
         await filterCache.store(filters, for: category)
         return filters
@@ -776,7 +779,7 @@ private actor FixtureCategoryCatalog {
 
     static func filters(category: MyVideoCategory) throws -> CatalogFilterSet {
         CatalogFilterSet(
-            genres: [try CatalogFilterOption(title: "剧情", value: "\(category.catalogCID),999")],
+            genres: category.genreEndpointPath == nil ? [] : [try CatalogFilterOption(title: "剧情", value: "\(category.catalogCID),999")],
             regions: [
                 try CatalogFilterOption(title: "大陆", value: "大陆"),
                 try CatalogFilterOption(title: "欧美", value: "欧美")

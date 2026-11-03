@@ -32,7 +32,7 @@ These are product invariants, not incidental implementation details.
 
 ### Discovery
 
-- Home contains Recommend, Movies, Series, Variety, and Anime plus Continue Watching. Do not
+- Home contains Recommend, Movies, Series, Variety, Anime, Short Drama, and Documentaries plus Continue Watching. Do not
   add a separate What’s New or New for You rail.
 - Recommend uses a separate bounded last-updated-sorted catalog pool (up to three
   40-title pages each for Movies, Series, and Anime), not the recent Home sample.
@@ -251,7 +251,7 @@ These are product invariants, not incidental implementation details.
 | App lifecycle, audio session, interruptions | `MyVideo/App/MyVideoApp.swift` |
 | Root routing and Home UI | `MyVideo/App/BrowserView.swift` |
 | Selection ordering and website fallback state | `MyVideo/App/BrowserViewModel.swift` |
-| Four-category Home loading | `MyVideo/App/MyVideoFeedService.swift` |
+| Six-category Home loading | `MyVideo/App/MyVideoFeedService.swift` |
 | Feed cache and partial-failure behavior | `MyVideo/App/FeedRepository.swift` |
 | All catalog queries, filters, decoding, signing | `MyVideo/App/CategoryCatalogService.swift` |
 | Catalog pagination and query state | `MyVideo/App/CategoryCatalogViewModel.swift` |
@@ -496,7 +496,7 @@ Fixtures prove deterministic contracts; they do not prove the provider still
 serves the same current shape. Before a provider-facing release, use bounded,
 read-only checks to verify:
 
-- All four Home categories return valid native items.
+- All six Home categories return valid native items.
 - All catalog filter metadata and page requests still decode.
 - One current movie resolves to a reachable HTTPS HLS program.
 - One serial title returns multiple newest-first episodes.
@@ -588,3 +588,9 @@ Genre requests include `cinema=1`. Never log bootstrap certificates or signed
 media URLs. The opt-in `testLiveYifanCatalogSearchAndPlayback` runs with
 `TEST_RUNNER_MYVIDEO_LIVE_PROVIDER=1` supplied to xcodebuild; keep normal unit/UI
 runs offline and deterministic.
+
+Short Drama uses category `0,1,8` and Documentary uses `0,1,7`. Both participate
+in Home, native catalogs, search, caching, and Saved/playback flows. Short Drama
+has no public genre endpoint; omit only its genre picker and keep common provider
+filters. Documentary genres use `/api/list/DocumentaryType`. Recommendation
+eligibility remains Movies/Series/Anime until separate rules are requested.

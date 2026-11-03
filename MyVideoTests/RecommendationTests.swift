@@ -9,7 +9,9 @@ final class RecommendationTests: XCTestCase {
             .movie: [item("movie-8", score: 8), item("movie-high", score: 8.01), item("invalid", score: 11), item("missing", score: nil)],
             .drama: [item("series-9", score: 9), item("series-high", score: 9.01), item("nan", score: .nan)],
             .anime: [item("anime-9", score: 9), item("anime-high", score: 9.01)],
-            .variety: [item("variety", score: 10)]
+            .variety: [item("variety", score: 10)],
+            .shortDrama: [item("short", score: 10)],
+            .documentary: [item("documentary", score: 10)]
         ]
         XCTAssertEqual(project(from: catalogs, savedIDs: [], suppressedIDs: []).map(\.id),
                        ["movie-high", "series-high", "anime-high"])

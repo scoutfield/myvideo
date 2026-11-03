@@ -58,6 +58,10 @@ final class MyVideoItemURLTests: XCTestCase {
             _ = try await catalog.fetchFilters(category: category)
             if category == .movie { movie = page.items.first }
             if category == .drama { serial = page.items.first }
+            if category == .shortDrama || category == .documentary {
+                let title = try XCTUnwrap(page.items.first)
+                _ = try await NativePlaybackResolver().resolve(item: title, preferredEpisodeKey: nil)
+            }
         }
         let found = try await ProviderSearchService().search(query: ProviderSearchQuery(validating: "沧元图"), page: 1, pageSize: 8)
         XCTAssertFalse(found.items.isEmpty)

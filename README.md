@@ -78,3 +78,6 @@ The active provider is `m.yifan.tv`. Legacy `yfsp.tv` links in saved titles,
 playback history, and artwork resolve through `yifan.tv` at use time without
 changing library identifiers. If a page has no embedded playback configuration,
 the app obtains the public configuration from the provider's web API.
+
+Home and native catalogs include Short Drama and Documentaries. Both categories
+also appear in search and support the existing save and playback controls.

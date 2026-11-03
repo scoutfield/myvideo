@@ -76,24 +76,26 @@ final class ProviderSearchContractTests: XCTestCase {
     }
 
     func testDecoderPreservesProviderOrderAndPlayableMetadataForSupportedCategories() throws {
-        let data = Self.searchResponse(count: 5, maxPage: 2, items: [
+        let data = Self.searchResponse(count: 7, maxPage: 2, items: [
             Self.item(key: "variety-first", title: "综艺", categoryPath: "0,1,5,39", score: "9.6"),
             Self.item(key: "movie-second", title: "电影", categoryPath: "0,1,3,28", score: "8.8"),
             Self.item(key: "series-third", title: "电视剧", categoryPath: "0,1,4,137", score: "8.2"),
             Self.item(key: "anime-fourth", title: "动漫", categoryPath: "0,1,6,46", score: "7.9"),
+            Self.item(key: "short", title: "短剧", categoryPath: "0,1,8,70", score: "9.9"),
+            Self.item(key: "documentary", title: "纪录片", categoryPath: "0,1,7,64", score: "8.8"),
             Self.item(key: "short-excluded", title: "短剧", categoryPath: "0,2,7", score: "9.9")
         ])
 
         let page = try ProviderSearchResponseDecoder.decode(data, page: 1, pageSize: 24)
 
-        XCTAssertEqual(page.items.map(\.id), ["variety-first", "movie-second", "series-third", "anime-fourth"])
+        XCTAssertEqual(page.items.map(\.id), ["variety-first", "movie-second", "series-third", "anime-fourth", "short", "documentary"])
         XCTAssertEqual(page.items.first?.playURL.absoluteString, "https://m.yifan.tv/play/variety-first")
         XCTAssertEqual(page.items.first?.latestEpisodeKey, "episode-12")
         XCTAssertEqual(page.items.first?.latestEpisodeTitle, "第12期")
         XCTAssertEqual(page.items.first?.quality, "4K")
         XCTAssertEqual(page.items.first?.score, 9.6)
         XCTAssertEqual(page.items.first?.thumbnailURL?.absoluteString, "https://static.yifan.tv/variety-first.jpg")
-        XCTAssertEqual(page.totalCount, 5)
+        XCTAssertEqual(page.totalCount, 7)
         XCTAssertFalse(page.isLastPage)
     }
 
